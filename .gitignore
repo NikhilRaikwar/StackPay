@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production
+dist/
+build/
+out/
+
+# Misc
+.DS_Store
+Thumbs.db
+*.log
+
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+
+# Clarinet / Stacks
+.clarinet/
+contracts/settings/Testnet.toml
+contracts/settings/Mainnet.toml
+# Keep Devnet.toml as it is usually harmless and useful for local dev
