@@ -1,0 +1,25 @@
+---
+id: 0
+name: Testnet deployment
+network: testnet
+stacks-node: "https://api.testnet.hiro.so"
+bitcoin-node: "http://blockstack:blockstacksystem@bitcoind.testnet.stacks.co:18332"
+plan:
+  batches:
+    - id: 0
+      transactions:
+        - contract-publish:
+            contract-name: payment-requests
+            expected-sender: ST2Y455NJPETB2SRSD0VDZP3KJE50WNHY0BN3TWY5
+            cost: 169716
+            path: "contracts\\payment-requests.clar"
+            anchor-block-only: true
+            clarity-version: 3
+        - contract-publish:
+            contract-name: username-registry
+            expected-sender: ST2Y455NJPETB2SRSD0VDZP3KJE50WNHY0BN3TWY5
+            cost: 169441
+            path: "contracts\\username-registry.clar"
+            anchor-block-only: true
+            clarity-version: 3
+      epoch: "3.2"
