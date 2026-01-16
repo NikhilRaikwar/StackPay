@@ -6,8 +6,9 @@ import { useWallet } from '../hooks/useWallet';
 import { createPaymentRequest, createInvoiceRequest, resolveStacksRecipient, getUSDCxBalance } from '../utils/stacksUtils';
 import { buildPaymentUrl } from '../utils/qrUtils';
 import { usePayment } from '../hooks/usePayment';
-import { db, isFirebaseConfigured } from '../utils/firebase';
+import { db, isFirebaseConfigured, auth } from '../utils/firebase';
 import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { signInAnonymously } from 'firebase/auth';
 
 export const QRGenerator = () => {
   const { address } = useWallet();
@@ -74,12 +75,20 @@ export const QRGenerator = () => {
           requestId,
           resolvedRecipient,
           parseFloat(amount),
-          memo || 'Payment Request'
+          memo || 'Payment Request',
+          address
         );
       } else {
-        // Invoice logic
+        // Invoice logic - Recipient is who receives funds (User input OR Self)
+        if (recipient.trim()) {
+          resolvedRecipient = await resolveStacksRecipient(recipient);
+        } else {
+          resolvedRecipient = address;
+        }
+
         await createInvoiceRequest(
           requestId,
+          resolvedRecipient,
           parseFloat(amount),
           memo || 'Invoice Request'
         );
@@ -99,8 +108,12 @@ export const QRGenerator = () => {
         createdAt: new Date().toISOString(),
       });
 
-      if (db && isFirebaseConfigured) {
+
+
+      if (db && auth && isFirebaseConfigured) {
         try {
+          await signInAnonymously(auth);
+          console.log("Firebase Auth User:", auth.currentUser?.uid);
           await setDoc(doc(db, 'payments', requestId), {
             requestId,
             creator: address,
@@ -184,43 +197,43 @@ export const QRGenerator = () => {
               </button>
             </div>
 
-            {/* Recipient - Only show for Escrow */}
-            {paymentType === 'escrow' && (
-              <div>
-                <label className="block font-mono text-xs text-text-muted mb-2 tracking-wider">
-                  RECIPIENT (WHO WILL SCAN THIS?)
-                </label>
-                <div className={`relative flex items-center bg-terminal-bg border rounded-lg transition-all duration-300 ${recipientStatus === 'valid' ? 'border-neon-green/50' :
-                  recipientStatus === 'invalid' ? 'border-status-error/50' :
-                    'border-terminal-border focus-within:border-neon-cyan'
-                  }`}>
-                  <input
-                    type="text"
-                    value={recipient}
-                    onChange={(event) => setRecipient(event.target.value)}
-                    placeholder="@alice or ST2..."
-                    className="flex-1 bg-transparent !border-none !outline-none !ring-0 !shadow-none font-mono text-white placeholder-text-muted px-4 py-3"
-                    style={{ outline: 'none', boxShadow: 'none', border: 'none' }}
-                  />
-                  <div className="pr-4 flex items-center">
-                    {recipientStatus === 'checking' && (
-                      <div className="spinner w-4 h-4 border-2" />
-                    )}
-                    {recipientStatus === 'valid' && (
-                      <div className="group relative cursor-help">
-                        <span className="text-green-500 text-lg">✓</span>
-                        <div className="absolute bottom-full mb-2 right-0 hidden group-hover:block bg-black border border-terminal-border text-xs px-2 py-1 rounded whitespace-nowrap z-50">
-                          Valid Recipient
-                        </div>
+            {/* Recipient */}
+            <div>
+              <label className="block font-mono text-xs text-text-muted mb-2 tracking-wider">
+                {paymentType === 'escrow'
+                  ? 'RECIPIENT (WHO WILL SCAN THIS?)'
+                  : 'RECIPIENT (WHO RECEIVES FUNDS?)'}
+              </label>
+              <div className={`relative flex items-center bg-terminal-bg border rounded-lg transition-all duration-300 ${recipientStatus === 'valid' ? 'border-neon-green/50' :
+                recipientStatus === 'invalid' ? 'border-status-error/50' :
+                  'border-terminal-border focus-within:border-neon-cyan'
+                }`}>
+                <input
+                  type="text"
+                  value={recipient}
+                  onChange={(event) => setRecipient(event.target.value)}
+                  placeholder={paymentType === 'escrow' ? "@alice or ST2..." : "Leave empty to receive to your wallet"}
+                  className="flex-1 bg-transparent !border-none !outline-none !ring-0 !shadow-none font-mono text-white placeholder-text-muted px-4 py-3"
+                  style={{ outline: 'none', boxShadow: 'none', border: 'none' }}
+                />
+                <div className="pr-4 flex items-center">
+                  {recipientStatus === 'checking' && (
+                    <div className="spinner w-4 h-4 border-2" />
+                  )}
+                  {recipientStatus === 'valid' && (
+                    <div className="group relative cursor-help">
+                      <span className="text-green-500 text-lg">✓</span>
+                      <div className="absolute bottom-full mb-2 right-0 hidden group-hover:block bg-black border border-terminal-border text-xs px-2 py-1 rounded whitespace-nowrap z-50">
+                        Valid Recipient
                       </div>
-                    )}
-                    {recipientStatus === 'invalid' && (
-                      <span className="text-red-500 text-lg">!</span>
-                    )}
-                  </div>
+                    </div>
+                  )}
+                  {recipientStatus === 'invalid' && (
+                    <span className="text-red-500 text-lg">!</span>
+                  )}
                 </div>
               </div>
-            )}
+            </div>
 
             {/* Amount */}
             <div>

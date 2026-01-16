@@ -1,34 +1,42 @@
 import { openContractCall } from '@stacks/connect';
 import {
   noneCV,
+  principalCV,
   standardPrincipalCV,
   stringAsciiCV,
   stringUtf8CV,
   uintCV,
-  Pc,
   serializeCV,
   deserializeCV,
   cvToJSON,
+  type FungiblePostCondition,
 } from '@stacks/transactions';
+
 import { STACKS_TESTNET } from '@stacks/network';
 
 const network = STACKS_TESTNET;
 
-// USDCx contract details
-export const USDCX_CONTRACT_ADDRESS =
-  'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM';
+// USDCx contract details - Official Testnet Token
+export const USDCX_CONTRACT_ADDRESS = 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM';
 export const USDCX_CONTRACT_NAME = 'usdcx';
 export const USDCX_ASSET_NAME = 'usdcx-token';
 
 // Your deployed contracts (update after deployment)
 export const PAYMENT_CONTRACT_ADDRESS = 'ST2Y455NJPETB2SRSD0VDZP3KJE50WNHY0BN3TWY5';
-export const PAYMENT_CONTRACT_NAME = 'payment-requests-v3';
+export const PAYMENT_CONTRACT_NAME = 'payment-requests-v9';
 export const USERNAME_CONTRACT_ADDRESS =
   'ST2Y455NJPETB2SRSD0VDZP3KJE50WNHY0BN3TWY5';
 export const USERNAME_CONTRACT_NAME = 'username-registry';
 
 const stacksApiUrl =
   STACKS_TESTNET.client.baseUrl ?? 'https://api.testnet.hiro.so';
+
+
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
 
 export const resolveStacksRecipient = async (input: string) => {
   const trimmed = input.trim();
@@ -52,7 +60,7 @@ export const resolveStacksRecipient = async (input: string) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sender: USERNAME_CONTRACT_ADDRESS,
-        arguments: [`0x${serializeCV(stringAsciiCV(username))}`],
+        arguments: [`0x${typeof serializeCV(stringAsciiCV(username)) === 'string' ? serializeCV(stringAsciiCV(username)) : bytesToHex(serializeCV(stringAsciiCV(username)) as Uint8Array)}`],
       }),
     }
   );
@@ -84,11 +92,16 @@ export const sendUSDCx = async (
   new Promise<string>((resolve, reject) => {
     const amountInMicroUnits = Math.floor(amount * 1_000_000);
 
-    const postConditions = [
-      Pc.origin()
-        .willSendEq(amountInMicroUnits)
-        .ft(`${USDCX_CONTRACT_ADDRESS}.${USDCX_CONTRACT_NAME}`, USDCX_ASSET_NAME),
-    ];
+    // Explicitly construct FungiblePostCondition
+    const postCondition: FungiblePostCondition = {
+      type: 'ft-postcondition',
+      address: senderAddress,
+      condition: 'eq',
+      amount: amountInMicroUnits,
+      asset: `${USDCX_CONTRACT_ADDRESS}.${USDCX_CONTRACT_NAME}::${USDCX_ASSET_NAME}`,
+    };
+
+    const postConditions = [postCondition];
 
     const options = {
       contractAddress: USDCX_CONTRACT_ADDRESS,
@@ -97,46 +110,46 @@ export const sendUSDCx = async (
       functionArgs: [
         uintCV(amountInMicroUnits),
         standardPrincipalCV(senderAddress),
-        standardPrincipalCV(recipient),
+        principalCV(recipient),
         noneCV(),
-      ],
+      ] as any[],
       network,
       postConditions,
       onFinish: (data: any) => resolve(data.txId as string),
       onCancel: () => reject(new Error('Transaction canceled')),
     };
 
-    void openContractCall(options);
+    void openContractCall(options as any);
   });
 
 export const createPaymentRequest = async (
   requestId: string,
   recipient: string,
   amount: number,
-  memo: string
+  memo: string,
+  userAddress: string
 ) =>
   new Promise<string>((resolve, reject) => {
     const amountInMicroUnits = Math.floor(amount * 1_000_000);
-    const userAddress =
-      network.client.baseUrl === 'https://api.mainnet.hiro.so'
-        ? JSON.parse(localStorage.getItem('blockstack-session') || '{}')
-          ?.userData?.profile?.stxAddress?.mainnet
-        : JSON.parse(localStorage.getItem('blockstack-session') || '{}')
-          ?.userData?.profile?.stxAddress?.testnet;
 
     if (!userAddress) {
       reject(new Error('User address not found'));
       return;
     }
 
-    const postConditions = [
-      Pc.principal(userAddress)
-        .willSendEq(amountInMicroUnits)
-        .ft(
-          `${USDCX_CONTRACT_ADDRESS}.${USDCX_CONTRACT_NAME}`,
-          USDCX_ASSET_NAME
-        ),
-    ];
+    // Logging inputs for debugging
+    console.log('[createPaymentRequest]', { requestId, recipient, amountInMicroUnits });
+
+    // Explicitly construct FungiblePostCondition
+    const postCondition: FungiblePostCondition = {
+      type: 'ft-postcondition',
+      address: userAddress,
+      condition: 'eq',
+      amount: amountInMicroUnits,
+      asset: `${USDCX_CONTRACT_ADDRESS}.${USDCX_CONTRACT_NAME}::${USDCX_ASSET_NAME}`,
+    };
+
+    const postConditions = [postCondition];
 
     const options = {
       contractAddress: PAYMENT_CONTRACT_ADDRESS,
@@ -144,21 +157,22 @@ export const createPaymentRequest = async (
       functionName: 'create-payment-request',
       functionArgs: [
         stringAsciiCV(requestId),
-        standardPrincipalCV(recipient),
+        principalCV(recipient),
         uintCV(amountInMicroUnits),
         stringUtf8CV(memo),
-      ],
+      ] as any[],
       network,
       postConditions,
       onFinish: (data: any) => resolve(data.txId as string),
       onCancel: () => reject(new Error('Transaction canceled')),
     };
 
-    void openContractCall(options);
+    void openContractCall(options as any);
   });
 
 export const createInvoiceRequest = async (
   requestId: string,
+  recipient: string,
   amount: number,
   memo: string
 ) =>
@@ -171,29 +185,25 @@ export const createInvoiceRequest = async (
       functionName: 'create-invoice-request',
       functionArgs: [
         stringAsciiCV(requestId),
+        principalCV(recipient),
         uintCV(amountInMicroUnits),
         stringUtf8CV(memo),
-      ],
+      ] as any[],
       network,
       onFinish: (data: any) => resolve(data.txId as string),
       onCancel: () => reject(new Error('Transaction canceled')),
     };
 
-    void openContractCall(options);
+    void openContractCall(options as any);
   });
 
 export const payInvoice = async (
   requestId: string,
-  amount: number
+  amount: number,
+  userAddress: string
 ) =>
   new Promise<string>((resolve, reject) => {
     const amountInMicroUnits = Math.floor(amount * 1_000_000);
-    const userAddress =
-      network.client.baseUrl === 'https://api.mainnet.hiro.so'
-        ? JSON.parse(localStorage.getItem('blockstack-session') || '{}')
-          ?.userData?.profile?.stxAddress?.mainnet
-        : JSON.parse(localStorage.getItem('blockstack-session') || '{}')
-          ?.userData?.profile?.stxAddress?.testnet;
 
     if (!userAddress) {
       reject(new Error('User address not found'));
@@ -201,27 +211,28 @@ export const payInvoice = async (
     }
 
     // Post condition: Payer sends USDCx to Creator
-    const postConditions = [
-      Pc.principal(userAddress)
-        .willSendEq(amountInMicroUnits)
-        .ft(
-          `${USDCX_CONTRACT_ADDRESS}.${USDCX_CONTRACT_NAME}`,
-          USDCX_ASSET_NAME
-        ),
-    ];
+    const postCondition: FungiblePostCondition = {
+      type: 'ft-postcondition',
+      address: userAddress,
+      condition: 'eq',
+      amount: amountInMicroUnits,
+      asset: `${USDCX_CONTRACT_ADDRESS}.${USDCX_CONTRACT_NAME}::${USDCX_ASSET_NAME}`,
+    };
+
+    const postConditions = [postCondition];
 
     const options = {
       contractAddress: PAYMENT_CONTRACT_ADDRESS,
       contractName: PAYMENT_CONTRACT_NAME,
       functionName: 'pay-invoice',
-      functionArgs: [stringAsciiCV(requestId)],
+      functionArgs: [stringAsciiCV(requestId)] as any[],
       network,
       postConditions,
       onFinish: (data: any) => resolve(data.txId as string),
       onCancel: () => reject(new Error('Transaction canceled')),
     };
 
-    void openContractCall(options);
+    void openContractCall(options as any);
   });
 
 export const cancelPaymentRequest = async (requestId: string) =>
@@ -230,13 +241,13 @@ export const cancelPaymentRequest = async (requestId: string) =>
       contractAddress: PAYMENT_CONTRACT_ADDRESS,
       contractName: PAYMENT_CONTRACT_NAME,
       functionName: 'cancel-payment-request',
-      functionArgs: [stringAsciiCV(requestId)],
+      functionArgs: [stringAsciiCV(requestId)] as any[],
       network,
       onFinish: (data: any) => resolve(data.txId as string),
       onCancel: () => reject(new Error('Transaction canceled')),
     };
 
-    void openContractCall(options);
+    void openContractCall(options as any);
   });
 
 export const getPaymentRequest = async (requestId: string) => {
@@ -247,7 +258,7 @@ export const getPaymentRequest = async (requestId: string) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sender: PAYMENT_CONTRACT_ADDRESS,
-        arguments: [`0x${serializeCV(stringAsciiCV(requestId))}`],
+        arguments: [`0x${typeof serializeCV(stringAsciiCV(requestId)) === 'string' ? serializeCV(stringAsciiCV(requestId)) : bytesToHex(serializeCV(stringAsciiCV(requestId)) as Uint8Array)}`],
       }),
     }
   );
@@ -277,28 +288,28 @@ export const claimPayment = async (
     const amountInMicroUnits = Math.floor(amount * 1_000_000);
     const contractPrincipal = `${PAYMENT_CONTRACT_ADDRESS}.${PAYMENT_CONTRACT_NAME}`;
 
-    // Calculate Post Condition: Contract transfers USDCx to Recipient
-    const postConditions = [
-      Pc.principal(contractPrincipal)
-        .willSendEq(amountInMicroUnits)
-        .ft(
-          `${USDCX_CONTRACT_ADDRESS}.${USDCX_CONTRACT_NAME}`,
-          USDCX_ASSET_NAME
-        ),
-    ];
+    const postCondition: FungiblePostCondition = {
+      type: 'ft-postcondition',
+      address: contractPrincipal,
+      condition: 'eq',
+      amount: amountInMicroUnits,
+      asset: `${USDCX_CONTRACT_ADDRESS}.${USDCX_CONTRACT_NAME}::${USDCX_ASSET_NAME}`,
+    };
+
+    const postConditions = [postCondition];
 
     const options = {
       contractAddress: PAYMENT_CONTRACT_ADDRESS,
       contractName: PAYMENT_CONTRACT_NAME,
       functionName: 'claim-payment',
-      functionArgs: [stringAsciiCV(requestId)],
+      functionArgs: [stringAsciiCV(requestId)] as any[],
       network,
       postConditions,
       onFinish: (data: any) => resolve(data.txId as string),
       onCancel: () => reject(new Error('Transaction canceled')),
     };
 
-    void openContractCall(options);
+    void openContractCall(options as any);
   });
 
 export const getUSDCxBalance = async (address: string): Promise<number> => {

@@ -1,4 +1,4 @@
-;; StacksPay Pro - Enhanced Payment Requests Contract 
+;; StacksPay Pro - Enhanced Payment Requests Contract
 ;; Manages both escrow payments and invoice requests with full event tracking
 
 ;; Define constants
@@ -12,7 +12,6 @@
 (define-constant err-invalid-amount (err u402))
 (define-constant err-transfer-failed (err u405))
 (define-constant err-already-exists (err u406))
-(define-constant err-invalid-request-id (err u407))
 
 ;; Payment request types
 (define-constant type-escrow "escrow")
@@ -47,14 +46,6 @@
 (define-data-var total-volume uint u0)
 
 ;; ============================================
-;; VALIDATION HELPERS
-;; ============================================
-
-(define-private (validate-request-id (request-id (string-ascii 36)))
-  (> (len request-id) u0)
-)
-
-;; ============================================
 ;; ESCROW MODE: Lock funds when creating request
 ;; ============================================
 
@@ -65,15 +56,14 @@
     (amount uint)
     (memo (string-utf8 256)))
   (begin
-    ;; Validate inputs
-    (asserts! (validate-request-id request-id) err-invalid-request-id)
+    ;; Validate amount
     (asserts! (> amount u0) err-invalid-amount)
     
     ;; Check request doesn't already exist
     (asserts! (is-none (map-get? payment-requests { request-id: request-id })) err-already-exists)
 
     ;; Transfer funds from Creator to Contract (Escrow)
-    (unwrap! (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usdcx transfer amount tx-sender (as-contract tx-sender) none) err-transfer-failed)
+    (unwrap! (contract-call? usdcx-contract transfer amount tx-sender (as-contract tx-sender) none) err-transfer-failed)
 
     ;; Store payment request
     (map-set payment-requests
@@ -126,12 +116,10 @@
 ;; Create an invoice (payment request without escrow)
 (define-public (create-invoice-request
     (request-id (string-ascii 36))
-    (recipient principal)
     (amount uint)
     (memo (string-utf8 256)))
   (begin
-    ;; Validate inputs
-    (asserts! (validate-request-id request-id) err-invalid-request-id)
+    ;; Validate amount
     (asserts! (> amount u0) err-invalid-amount)
     
     ;; Check request doesn't already exist
@@ -142,7 +130,7 @@
       { request-id: request-id }
       {
         creator: tx-sender,
-        recipient: recipient,
+        recipient: tx-sender,  ;; Creator is recipient for invoices
         amount: amount,
         memo: memo,
         request-type: type-invoice,
@@ -169,7 +157,6 @@
       request-id: request-id,
       request-type: type-invoice,
       creator: tx-sender,
-      recipient: recipient,
       amount: amount,
       memo: memo,
       stacks-block: stacks-block-height,
@@ -180,13 +167,11 @@
   )
 )
 
-;; Pay an invoice (direct transfer to recipient)
-;; FIXED: Added creator to let binding
+;; Pay an invoice (direct transfer to creator)
 (define-public (pay-invoice (request-id (string-ascii 36)))
   (let (
     (request (unwrap! (map-get? payment-requests { request-id: request-id }) err-not-found))
     (creator (get creator request))
-    (recipient (get recipient request))
     (amount (get amount request))
   )
     ;; Verify it's an invoice type
@@ -195,8 +180,8 @@
     ;; Verify status is pending
     (asserts! (is-eq (get status request) "pending") err-already-claimed)
 
-    ;; Transfer USDCx directly from payer (tx-sender) to creator
-    (unwrap! (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usdcx transfer amount tx-sender creator none) err-transfer-failed)
+    ;; Transfer USDCx directly from payer to creator
+    (unwrap! (contract-call? usdcx-contract transfer amount tx-sender creator none) err-transfer-failed)
 
     ;; Update status
     (map-set payment-requests
@@ -217,7 +202,6 @@
       event: "invoice-paid",
       request-id: request-id,
       payer: tx-sender,
-      recipient: recipient,
       creator: creator,
       amount: amount,
       stacks-block: stacks-block-height,
@@ -250,7 +234,7 @@
     (asserts! (is-eq (get status request) "pending") err-already-claimed)
 
     ;; Transfer USDCx from Contract to Recipient
-    (as-contract (unwrap! (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usdcx transfer amount tx-sender recipient none) err-transfer-failed))
+    (as-contract (unwrap! (contract-call? usdcx-contract transfer amount tx-sender recipient none) err-transfer-failed))
 
     ;; Update status
     (map-set payment-requests
@@ -298,10 +282,10 @@
     (if (is-eq request-type type-escrow)
       (begin
         ;; Refund USDCx from Contract to Creator
-        (as-contract (unwrap! (contract-call? 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usdcx transfer amount tx-sender creator none) err-transfer-failed))
+        (as-contract (unwrap! (contract-call? usdcx-contract transfer amount tx-sender creator none) err-transfer-failed))
       )
       ;; For invoices, just update status (no refund needed)
-      true
+      (ok true)
     )
 
     ;; Update status
@@ -369,22 +353,13 @@
   )
 )
 
-;; Check if invoice is payable and intended for user
-(define-read-only (is-payable (request-id (string-ascii 36)) (user principal))
+;; Check if invoice is payable
+(define-read-only (is-payable (request-id (string-ascii 36)))
   (match (map-get? payment-requests { request-id: request-id })
     request (ok (and 
       (is-eq (get status request) "pending")
       (is-eq (get request-type request) type-invoice)
-      (is-eq (get recipient request) user)
     ))
-    err-not-found
-  )
-)
-
-;; Get payment type
-(define-read-only (get-payment-type (request-id (string-ascii 36)))
-  (match (map-get? payment-requests { request-id: request-id })
-    request (ok (get request-type request))
     err-not-found
   )
 )

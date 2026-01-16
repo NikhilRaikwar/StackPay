@@ -58,9 +58,10 @@ interface PendingClaim {
   amount: number;
   memo: string;
   createdAt: any;
+  requestType?: string;
 }
 
-type FilterType = 'all' | 'sent' | 'received' | 'pending';
+type FilterType = 'all' | 'sent' | 'received' | 'pending' | 'requests';
 
 export const PaymentHistory = () => {
   usePayment();
@@ -130,7 +131,8 @@ export const PaymentHistory = () => {
             creator: data.creator,
             amount: data.amount,
             memo: data.memo,
-            createdAt: data.createdAt
+            createdAt: data.createdAt,
+            requestType: data.type || 'escrow'
           });
         });
         setPendingClaims(claims);
@@ -211,7 +213,7 @@ export const PaymentHistory = () => {
                 memo,
                 status: currentStatus as any,
                 timestamp: tx.block_time * 1000,
-                type: 'request',
+                type: tx.sender_address === address ? 'sent' : 'request', // If I didn't send it, it's a request FOR me
               });
             } else if (functionName === 'claim-payment') {
               const args = tx.contract_call.function_args;
@@ -242,13 +244,19 @@ export const PaymentHistory = () => {
             } else if (functionName === 'pay-invoice') {
               const args = tx.contract_call.function_args;
               const requestId = args[0]?.repr?.replace(/"/g, '') || tx.tx_id.substring(0, 8);
-              const amount = parseInt(args[1]?.repr?.replace('u', '') || '0') / 1_000_000;
+
+              // Get amount and recipient from ft_transfers (since pay-invoice only takes request-id as arg)
+              const ftTransfer = tx.ft_transfers?.find((ft: any) =>
+                ft.asset_identifier.includes(USDCX_CONTRACT_ADDRESS)
+              );
+              const amount = ftTransfer ? parseInt(ftTransfer.amount) / 1_000_000 : 0;
+              const recipient = ftTransfer?.recipient || 'Unknown';
 
               items.push({
                 id: requestId,
                 txId: tx.tx_id,
                 amount,
-                recipient: 'Me', // Invoice paid by me (or generally paid) - looking at sender logic
+                recipient: recipient,
                 sender: tx.sender_address,
                 memo: 'Invoice Paid',
                 status: tx.tx_status === 'success' ? 'completed' : tx.tx_status === 'pending' ? 'pending' : 'failed',
@@ -343,8 +351,9 @@ export const PaymentHistory = () => {
   const filteredPayments = useMemo(() => {
     if (filter === 'all') return transactions;
     if (filter === 'pending') return transactions.filter((p) => p.status === 'pending');
-    if (filter === 'sent') return transactions.filter((p) => p.type === 'sent' || p.type === 'request');
+    if (filter === 'sent') return transactions.filter((p) => p.type === 'sent');
     if (filter === 'received') return transactions.filter((p) => p.type === 'received');
+    if (filter === 'requests') return transactions.filter((p) => p.type === 'request' && p.sender !== address);
     return transactions;
   }, [transactions, filter]);
 
@@ -360,6 +369,7 @@ export const PaymentHistory = () => {
     { key: 'all', label: 'ALL' },
     { key: 'sent', label: 'SENT' },
     { key: 'received', label: 'RECEIVED' },
+    { key: 'requests', label: 'REQUESTS' },
     { key: 'pending', label: 'PENDING' },
   ];
 
@@ -427,13 +437,23 @@ export const PaymentHistory = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <p className="font-display font-bold text-lg text-neon-green">+${claim.amount.toFixed(2)}</p>
-                  <button
-                    onClick={() => navigate(`/pay/${claim.requestId}`)}
-                    className="px-4 py-2 bg-neon-green text-terminal-bg font-mono text-xs font-bold rounded hover:opacity-90 transition-opacity"
-                  >
-                    CLAIM
-                  </button>
+                  <p className={`font-display font-bold text-lg ${claim.requestType === 'invoice' ? 'text-neon-cyan' : 'text-neon-green'}`}>
+                    {claim.requestType === 'invoice' ? '-' : '+'}${claim.amount.toFixed(2)}
+                  </p>
+                  {claim.requestType === 'invoice' ? (
+                    <Link to={`/pay/${claim.requestId}`}>
+                      <button className="px-4 py-2 bg-neon-cyan text-terminal-bg font-mono text-xs font-bold rounded hover:opacity-90 transition-opacity">
+                        PAY
+                      </button>
+                    </Link>
+                  ) : (
+                    <button
+                      onClick={() => navigate(`/pay/${claim.requestId}`)}
+                      className="px-4 py-2 bg-neon-green text-terminal-bg font-mono text-xs font-bold rounded hover:opacity-90 transition-opacity"
+                    >
+                      CLAIM
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -585,25 +605,33 @@ export const PaymentHistory = () => {
                       </p>
                       {payment.status === 'completed' || payment.status === 'paid' ? (
                         <span className="status-badge-completed text-[10px]">{payment.status.toUpperCase()}</span>
-                      ) : payment.status === 'cancelled' ? (
-                        <span className="status-badge-error text-[10px]">CANCELLED</span>
                       ) : payment.status === 'pending' ? (
-                        <div className="flex flex-col items-end gap-1">
-                          <span className="status-badge-pending text-[10px]">PENDING</span>
-                          {payment.type === 'request' && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleCancel(payment.id);
-                              }}
-                              className="text-[10px] text-status-error hover:underline"
-                            >
-                              CANCEL
-                            </button>
+                        <div className="flex flex-col items-end gap-2">
+                          {payment.type === 'request' && payment.sender !== address && (
+                            <Link to={`/pay/${payment.id}`}>
+                              <button className="px-3 py-1 bg-neon-cyan text-terminal-bg font-bold rounded text-xs hover:opacity-90 transition-opacity">
+                                PAY
+                              </button>
+                            </Link>
                           )}
+
+                          <div className="flex flex-col items-end gap-1">
+                            <span className="status-badge-pending text-[10px]">PENDING</span>
+                            {payment.type === 'request' && payment.sender === address && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCancel(payment.id);
+                                }}
+                                className="text-[10px] text-status-error hover:underline"
+                              >
+                                CANCEL
+                              </button>
+                            )}
+                          </div>
                         </div>
                       ) : (
-                        <span className="status-badge-error text-[10px]">FAILED</span>
+                        <span className="status-badge-error text-[10px]">{payment.status.toUpperCase()}</span>
                       )}
                     </div>
 

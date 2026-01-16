@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
-import { AppConfig, UserSession, showConnect } from '@stacks/connect';
+import { AppConfig, UserSession, connect } from '@stacks/connect';
 
 interface WalletContextType {
   userSession: UserSession;
@@ -44,35 +44,42 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [userSession]);
 
-  const connectWallet = useCallback(() => {
-    console.log('Connect wallet clicked, calling showConnect...');
+  const connectWallet = useCallback(async () => {
+    console.log('Connect wallet clicked, calling connect...');
     try {
-      showConnect({
-        appDetails: {
-          name: 'StacksPay Pro',
-          icon: window.location.origin + '/vite.svg',
-        },
-        onFinish: () => {
-          console.log('Wallet connection finished');
-          // Update state immediately without reload
-          if (userSession.isUserSignedIn()) {
-            const data = userSession.loadUserData();
-            setUserData(data);
-            setIsConnected(true);
-            setAddress(data.profile.stxAddress.testnet);
+      const response = await connect();
+      console.log('Wallet connection finished', response);
+
+      if (response.addresses && response.addresses.length > 0) {
+        const stxAddressData = response.addresses.find(a => a.symbol === 'STX') || response.addresses[0];
+        const address = stxAddressData.address;
+
+        const mockUserData = {
+          profile: {
+            stxAddress: {
+              testnet: address,
+              mainnet: address
+            }
           }
-        },
-        onCancel: () => {
-          console.log('User cancelled wallet connection');
-        },
-        userSession,
-      });
-      console.log('showConnect called successfully');
+        };
+
+        // Persist for legacy support (UserSession and stacksUtils)
+        // We try to write a minimal session structure that UserSession and stacksUtils might recognize
+        const sessionData = {
+          userData: mockUserData,
+          version: '1.0.0'
+        };
+        localStorage.setItem('blockstack-session', JSON.stringify(sessionData));
+
+        setUserData(mockUserData);
+        setIsConnected(true);
+        setAddress(address);
+      }
     } catch (error) {
-      console.error('Error calling showConnect:', error);
-      alert('Failed to open wallet connection modal. Please make sure you have Leather or Xverse wallet installed.');
+      console.error('Error calling connect:', error);
+      alert('Failed to connect wallet.');
     }
-  }, [userSession]);
+  }, []);
 
   const disconnectWallet = useCallback(() => {
     userSession.signUserOut();

@@ -110,7 +110,7 @@ export const ClaimPayment = () => {
     setClaiming(true);
     if (!payment) return;
     try {
-      await payInvoice(paymentId, payment.amount);
+      await payInvoice(paymentId, payment.amount, address);
 
       if (db && isFirebaseConfigured) {
         try {
@@ -156,7 +156,8 @@ export const ClaimPayment = () => {
   }
 
   const isRecipient = address?.toLowerCase() === payment.recipient.toLowerCase();
-  const canClaim = isRecipient && payment.status === 'pending';
+  const canClaim = isRecipient && payment.status === 'pending' && payment.requestType === 'escrow';
+  const canPay = isRecipient && payment.status === 'pending' && payment.requestType === 'invoice';
 
   return (
     <div className="max-w-lg mx-auto">
@@ -283,16 +284,13 @@ export const ClaimPayment = () => {
                   </>
                 )}
               </motion.button>
-            ) : null}
-
-            {/* Pay Invoice Action */}
-            {isConnected && payment.requestType === 'invoice' && payment.status === 'pending' && (
+            ) : canPay ? (
               <motion.button
                 whileHover={{ scale: claiming ? 1 : 1.02 }}
                 whileTap={{ scale: claiming ? 1 : 0.98 }}
                 onClick={handlePay}
                 disabled={claiming}
-                className="w-full btn-neon-cyan py-4 text-base flex items-center justify-center gap-3 mt-4"
+                className="w-full btn-neon-cyan py-4 text-base flex items-center justify-center gap-3"
               >
                 {claiming ? (
                   <>
@@ -306,7 +304,7 @@ export const ClaimPayment = () => {
                   </>
                 )}
               </motion.button>
-            )}
+            ) : null}
           </div>
         </div>
       </motion.div>

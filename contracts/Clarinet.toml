@@ -5,15 +5,15 @@ authors = []
 telemetry = true
 cache_dir = '.\.cache'
 
-[[project.requirements]]
-contract_id = 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usdcx'
+# NOTE: USDCx requirement removed to prevent remapping.
+# Contract calls real testnet USDCx at ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usdcx directly.
 
-[contracts.payment-requests-v3]  # Changed to v3
+[contracts.payment-requests-v9]  # Changed to v9 - no remapping
 path = 'contracts/payment-requests.clar'
 clarity_version = 3
 epoch = 'latest'
 
-[contracts.username-registry-v3]  # Changed to v3
+[contracts.username-registry]
 path = 'contracts/username-registry.clar'
 clarity_version = 3
 epoch = 'latest'
