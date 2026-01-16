@@ -8,18 +8,24 @@ plan:
   batches:
     - id: 0
       transactions:
+        - requirement-publish:
+            contract-id: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sip-010-trait-ft-standard
+            remap-sender: ST2Y455NJPETB2SRSD0VDZP3KJE50WNHY0BN3TWY5
+            remap-principals:
+              ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM: ST2Y455NJPETB2SRSD0VDZP3KJE50WNHY0BN3TWY5
+            cost: 8400
+            path: ".\\.cache\\requirements\\ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sip-010-trait-ft-standard.clar"
+            clarity-version: 3
+      epoch: "3.1"
+    - id: 1
+      transactions:
+
         - contract-publish:
-            contract-name: payment-requests
+            contract-name: payment-requests-v3
             expected-sender: ST2Y455NJPETB2SRSD0VDZP3KJE50WNHY0BN3TWY5
-            cost: 169716
+            cost: 106310
             path: "contracts\\payment-requests.clar"
             anchor-block-only: true
             clarity-version: 3
-        - contract-publish:
-            contract-name: username-registry
-            expected-sender: ST2Y455NJPETB2SRSD0VDZP3KJE50WNHY0BN3TWY5
-            cost: 169441
-            path: "contracts\\username-registry.clar"
-            anchor-block-only: true
-            clarity-version: 3
+
       epoch: "3.2"

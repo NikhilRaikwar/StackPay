@@ -7,15 +7,17 @@ cache_dir = '.\.cache'
 
 [[project.requirements]]
 contract_id = 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usdcx'
-[contracts.payment-requests]
+
+[contracts.payment-requests-v3]  # Changed to v3
 path = 'contracts/payment-requests.clar'
 clarity_version = 3
 epoch = 'latest'
 
-[contracts.username-registry]
+[contracts.username-registry-v3]  # Changed to v3
 path = 'contracts/username-registry.clar'
 clarity_version = 3
 epoch = 'latest'
+
 [repl.analysis]
 passes = ['check_checker']
 
