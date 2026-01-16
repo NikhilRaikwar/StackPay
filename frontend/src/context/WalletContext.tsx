@@ -51,7 +51,7 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('Wallet connection finished', response);
 
       if (response.addresses && response.addresses.length > 0) {
-        const stxAddressData = response.addresses.find((a: { symbol: string; address: string }) => a.symbol === 'STX') || response.addresses[0];
+        const stxAddressData = response.addresses.find((a) => a.symbol === 'STX') || response.addresses[0];
         const address = stxAddressData.address;
 
         const mockUserData = {
