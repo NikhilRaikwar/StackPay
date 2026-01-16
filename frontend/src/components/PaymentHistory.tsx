@@ -3,7 +3,15 @@ import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { usePayment } from '../hooks/usePayment';
 import { useWallet } from '../hooks/useWallet';
-import { PAYMENT_CONTRACT_ADDRESS, PAYMENT_CONTRACT_NAME, USDCX_CONTRACT_ADDRESS, USDCX_CONTRACT_NAME, USERNAME_CONTRACT_ADDRESS, USERNAME_CONTRACT_NAME } from '../utils/stacksUtils';
+import {
+  cancelPaymentRequest,
+  PAYMENT_CONTRACT_ADDRESS,
+  PAYMENT_CONTRACT_NAME,
+  USDCX_CONTRACT_ADDRESS,
+  USDCX_CONTRACT_NAME,
+  USERNAME_CONTRACT_ADDRESS,
+  USERNAME_CONTRACT_NAME
+} from '../utils/stacksUtils';
 import { standardPrincipalCV, cvToJSON, deserializeCV, serializeCV } from '@stacks/transactions';
 import { STACKS_TESTNET } from '@stacks/network';
 import { db, isFirebaseConfigured } from '../utils/firebase';
@@ -39,7 +47,7 @@ interface PaymentItem {
   recipient: string;
   sender: string;
   memo: string;
-  status: 'pending' | 'completed' | 'failed';
+  status: 'pending' | 'completed' | 'failed' | 'paid' | 'cancelled';
   timestamp: number;
   type: 'sent' | 'received' | 'request';
 }
@@ -156,6 +164,26 @@ export const PaymentHistory = () => {
         const data = await response.json();
 
         const items: PaymentItem[] = [];
+        const requestStatusMap: Record<string, 'completed' | 'cancelled' | 'paid'> = {};
+
+        // First pass: Find status updates (claims, payments, cancels)
+        for (const tx of data.results as Transaction[]) {
+          if (tx.contract_call?.contract_id === `${PAYMENT_CONTRACT_ADDRESS}.${PAYMENT_CONTRACT_NAME}` && tx.tx_status === 'success') {
+            const functionName = tx.contract_call.function_name;
+            const args = tx.contract_call.function_args;
+            const requestId = args[0]?.repr?.replace(/"/g, '');
+
+            if (requestId) {
+              if (functionName === 'claim-payment') {
+                requestStatusMap[requestId] = 'completed';
+              } else if (functionName === 'pay-invoice') {
+                requestStatusMap[requestId] = 'paid';
+              } else if (functionName === 'cancel-payment-request') {
+                requestStatusMap[requestId] = 'cancelled';
+              }
+            }
+          }
+        }
 
         for (const tx of data.results as Transaction[]) {
           // Check for payment contract interactions
@@ -169,6 +197,11 @@ export const PaymentHistory = () => {
               const amount = parseInt(args[2]?.repr?.replace('u', '') || '0') / 1_000_000;
               const memo = args[3]?.repr?.replace(/"/g, '') || 'Payment Request';
 
+              // Determine current status based on history
+              let currentStatus = 'pending';
+              if (tx.tx_status !== 'success') currentStatus = 'failed';
+              else if (requestStatusMap[requestId]) currentStatus = requestStatusMap[requestId];
+
               items.push({
                 id: requestId,
                 txId: tx.tx_id,
@@ -176,7 +209,7 @@ export const PaymentHistory = () => {
                 recipient: recipient.replace(/'/g, ''),
                 sender: tx.sender_address,
                 memo,
-                status: tx.tx_status === 'success' ? 'completed' : tx.tx_status === 'pending' ? 'pending' : 'failed',
+                status: currentStatus as any,
                 timestamp: tx.block_time * 1000,
                 type: 'request',
               });
@@ -190,9 +223,6 @@ export const PaymentHistory = () => {
               );
               const amount = ftTransfer ? parseInt(ftTransfer.amount) / 1_000_000 : 0;
 
-              // For received claims, the sender is usually the contract if successful
-              // If failed, we don't have transfer info, so we use a fallback or the tx sender (which is self)
-              // But 'sender' in PaymentItem implies 'From'.
               let sender = ftTransfer?.sender || '';
               if (!sender && tx.tx_status !== 'success') {
                 sender = 'Unknown';
@@ -208,6 +238,22 @@ export const PaymentHistory = () => {
                 status: tx.tx_status === 'success' ? 'completed' : tx.tx_status === 'pending' ? 'pending' : 'failed',
                 timestamp: tx.block_time * 1000,
                 type: 'received',
+              });
+            } else if (functionName === 'pay-invoice') {
+              const args = tx.contract_call.function_args;
+              const requestId = args[0]?.repr?.replace(/"/g, '') || tx.tx_id.substring(0, 8);
+              const amount = parseInt(args[1]?.repr?.replace('u', '') || '0') / 1_000_000;
+
+              items.push({
+                id: requestId,
+                txId: tx.tx_id,
+                amount,
+                recipient: 'Me', // Invoice paid by me (or generally paid) - looking at sender logic
+                sender: tx.sender_address,
+                memo: 'Invoice Paid',
+                status: tx.tx_status === 'success' ? 'completed' : tx.tx_status === 'pending' ? 'pending' : 'failed',
+                timestamp: tx.block_time * 1000,
+                type: tx.sender_address === address ? 'sent' : 'received',
               });
             }
           }
@@ -235,12 +281,12 @@ export const PaymentHistory = () => {
             }
           }
 
-          // Also check ft_transfers for any USDCx movements
+          // FT Transfers logic (kept similar but de-duplicated if possible)
           if (tx.ft_transfers) {
             for (const ft of tx.ft_transfers) {
               if (ft.asset_identifier.includes(USDCX_CONTRACT_ADDRESS) &&
                 (ft.sender === address || ft.recipient === address)) {
-                // Avoid duplicates
+                // Avoid duplicates with items already added via contract calls
                 if (!items.find(item => item.txId === tx.tx_id)) {
                   items.push({
                     id: tx.tx_id,
@@ -282,6 +328,17 @@ export const PaymentHistory = () => {
 
     void fetchTransactions();
   }, [address]);
+
+  const handleCancel = async (requestId: string) => {
+    if (!requestId) return;
+    try {
+      await cancelPaymentRequest(requestId);
+      // Optimistically update
+      setTransactions(prev => prev.map(t => t.id === requestId ? { ...t, status: 'cancelled' } : t));
+    } catch (e) {
+      console.error("Cancel failed", e);
+    }
+  };
 
   const filteredPayments = useMemo(() => {
     if (filter === 'all') return transactions;
@@ -526,10 +583,25 @@ export const PaymentHistory = () => {
                         }`}>
                         {payment.type === 'sent' || payment.type === 'request' ? '-' : '+'}${payment.amount.toFixed(2)}
                       </p>
-                      {payment.status === 'completed' ? (
-                        <span className="status-badge-completed text-[10px]">COMPLETED</span>
+                      {payment.status === 'completed' || payment.status === 'paid' ? (
+                        <span className="status-badge-completed text-[10px]">{payment.status.toUpperCase()}</span>
+                      ) : payment.status === 'cancelled' ? (
+                        <span className="status-badge-error text-[10px]">CANCELLED</span>
                       ) : payment.status === 'pending' ? (
-                        <span className="status-badge-pending text-[10px]">PENDING</span>
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="status-badge-pending text-[10px]">PENDING</span>
+                          {payment.type === 'request' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCancel(payment.id);
+                              }}
+                              className="text-[10px] text-status-error hover:underline"
+                            >
+                              CANCEL
+                            </button>
+                          )}
+                        </div>
                       ) : (
                         <span className="status-badge-error text-[10px]">FAILED</span>
                       )}

@@ -9,6 +9,35 @@ export const BridgeInterface = () => {
   const [bridging, setBridging] = useState(false);
   const [bridgeStatus, setBridgeStatus] = useState<string>('');
   const [txHash, setTxHash] = useState('');
+  const [history, setHistory] = useState<Array<{
+    hash: string;
+    amount: number;
+    date: number;
+    status: 'completed' | 'pending' | 'failed'
+  }>>(() => {
+    const saved = localStorage.getItem('bridge_history');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const saveToHistory = (hash: string, amount: number) => {
+    const newTx = {
+      hash,
+      amount,
+      date: Date.now(),
+      status: 'pending' as const
+    };
+    const newHistory = [newTx, ...history];
+    setHistory(newHistory);
+    localStorage.setItem('bridge_history', JSON.stringify(newHistory));
+  };
+
+  const updateHistoryStatus = (hash: string, status: 'completed' | 'pending' | 'failed') => {
+    const newHistory = history.map(tx =>
+      tx.hash === hash ? { ...tx, status } : tx
+    );
+    setHistory(newHistory);
+    localStorage.setItem('bridge_history', JSON.stringify(newHistory));
+  };
 
   const handleBridge = async () => {
     if (!address || !amount) return;
@@ -22,9 +51,11 @@ export const BridgeInterface = () => {
       const hash = await bridgeUSDCFromEthereum(parseFloat(amount), address);
       setTxHash(hash);
       setBridgeStatus('pending');
+      saveToHistory(hash, parseFloat(amount));
 
       pollBridgeStatus(hash, (status) => {
         setBridgeStatus(status);
+        updateHistoryStatus(hash, status);
         if (status === 'completed' || status === 'failed') {
           setBridging(false);
         }
@@ -33,6 +64,24 @@ export const BridgeInterface = () => {
       console.error('Bridge error:', error);
       alert('Failed to initiate bridge');
       setBridging(false);
+    }
+  };
+
+  const loadHistoryItem = (tx: typeof history[0]) => {
+    setTxHash(tx.hash);
+    setAmount(tx.amount.toString());
+    setBridgeStatus(tx.status);
+
+    // Resume polling if pending
+    if (tx.status === 'pending') {
+      setBridging(true);
+      pollBridgeStatus(tx.hash, (status) => {
+        setBridgeStatus(status);
+        updateHistoryStatus(tx.hash, status);
+        if (status === 'completed' || status === 'failed') {
+          setBridging(false);
+        }
+      });
     }
   };
 
@@ -97,20 +146,21 @@ export const BridgeInterface = () => {
               <label className="block font-mono text-xs text-text-muted mb-2 tracking-wider">
                 AMOUNT (USDC)
               </label>
-              <div className="relative">
+              <div className="relative flex items-center px-4 py-3 bg-terminal-bg border border-terminal-border rounded-lg focus-within:border-neon-magenta focus-within:ring-2 focus-within:ring-neon-magenta/20 transition-all duration-300">
+                <span className="text-neon-magenta text-xl font-display mr-1">$</span>
                 <input
                   type="number"
                   value={amount}
                   onChange={(event) => setAmount(event.target.value)}
                   placeholder="0.00"
                   step="0.01"
-                  min="10"
-                  className="terminal-input pl-10 text-xl font-display"
+                  min="1"
+                  className="flex-1 bg-transparent !border-none !outline-none !ring-0 !shadow-none text-xl font-display text-white placeholder-text-muted p-0"
+                  style={{ outline: 'none', boxShadow: 'none', border: 'none' }}
                   disabled={bridging}
                 />
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neon-magenta text-xl">$</span>
               </div>
-              <p className="font-mono text-xs text-text-muted mt-2">Minimum: 10 USDC</p>
+              <p className="font-mono text-xs text-text-muted mt-2">Minimum: 1 USDC</p>
             </div>
 
             {/* Destination */}
@@ -209,23 +259,21 @@ export const BridgeInterface = () => {
                       transition={{ delay: i * 0.1 }}
                       className="flex items-center gap-4"
                     >
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center border-2 ${
-                        step.status === 'complete'
-                          ? 'bg-neon-green/10 border-neon-green text-neon-green'
-                          : step.status === 'active'
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center border-2 ${step.status === 'complete'
+                        ? 'bg-neon-green/10 border-neon-green text-neon-green'
+                        : step.status === 'active'
                           ? 'bg-neon-cyan/10 border-neon-cyan text-neon-cyan animate-pulse'
                           : 'bg-terminal-bg border-terminal-border text-text-muted'
-                      }`}>
+                        }`}>
                         {step.status === 'complete' ? '✓' : step.status === 'active' ? '◎' : i + 1}
                       </div>
                       <div>
-                        <p className={`font-mono text-sm ${
-                          step.status === 'complete'
-                            ? 'text-neon-green'
-                            : step.status === 'active'
+                        <p className={`font-mono text-sm ${step.status === 'complete'
+                          ? 'text-neon-green'
+                          : step.status === 'active'
                             ? 'text-neon-cyan'
                             : 'text-text-muted'
-                        }`}>
+                          }`}>
                           {step.label}
                         </p>
                         <p className="font-mono text-xs text-text-muted">
@@ -237,20 +285,18 @@ export const BridgeInterface = () => {
                 </div>
 
                 {/* Status */}
-                <div className={`p-4 rounded-lg border ${
-                  bridgeStatus === 'completed'
-                    ? 'bg-neon-green/10 border-neon-green/30'
-                    : bridgeStatus === 'failed'
+                <div className={`p-4 rounded-lg border ${bridgeStatus === 'completed'
+                  ? 'bg-neon-green/10 border-neon-green/30'
+                  : bridgeStatus === 'failed'
                     ? 'bg-status-error/10 border-status-error/30'
                     : 'bg-neon-cyan/10 border-neon-cyan/30'
-                }`}>
-                  <p className={`font-display font-bold text-lg ${
-                    bridgeStatus === 'completed'
-                      ? 'text-neon-green'
-                      : bridgeStatus === 'failed'
+                  }`}>
+                  <p className={`font-display font-bold text-lg ${bridgeStatus === 'completed'
+                    ? 'text-neon-green'
+                    : bridgeStatus === 'failed'
                       ? 'text-status-error'
                       : 'text-neon-cyan'
-                  }`}>
+                    }`}>
                     {bridgeStatus.toUpperCase()}
                   </p>
                 </div>
@@ -282,6 +328,63 @@ export const BridgeInterface = () => {
           </div>
         </motion.div>
       </div>
+
+      {/* History Section */}
+      {history.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-6 terminal-card overflow-hidden"
+        >
+          <div className="px-6 py-4 border-b border-terminal-border bg-terminal-bg/50">
+            <h3 className="font-display font-bold text-lg text-white">HISTORY</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-terminal-border bg-terminal-bg/30">
+                  <th className="px-6 py-3 font-mono text-xs text-text-muted">DATE</th>
+                  <th className="px-6 py-3 font-mono text-xs text-text-muted">AMOUNT</th>
+                  <th className="px-6 py-3 font-mono text-xs text-text-muted">TX HASH</th>
+                  <th className="px-6 py-3 font-mono text-xs text-text-muted">STATUS</th>
+                  <th className="px-6 py-3 font-mono text-xs text-text-muted">ACTION</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-terminal-border">
+                {history.map((tx) => (
+                  <tr key={tx.hash} className="hover:bg-terminal-bg/50 transition-colors">
+                    <td className="px-6 py-3 font-mono text-sm text-text-muted">
+                      {new Date(tx.date).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-3 font-mono text-sm text-white">
+                      {tx.amount} USDC
+                    </td>
+                    <td className="px-6 py-3 font-mono text-sm text-text-muted">
+                      {tx.hash.substring(0, 6)}...{tx.hash.substring(tx.hash.length - 4)}
+                    </td>
+                    <td className="px-6 py-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-mono
+                        ${tx.status === 'completed' ? 'bg-neon-green/10 text-neon-green' :
+                          tx.status === 'failed' ? 'bg-status-error/10 text-status-error' :
+                            'bg-neon-cyan/10 text-neon-cyan'}`}>
+                        {tx.status.toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="px-6 py-3">
+                      <button
+                        onClick={() => loadHistoryItem(tx)}
+                        className="text-xs font-mono text-neon-magenta hover:underline"
+                      >
+                        VIEW STATUS
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </motion.div>
+      )}
 
       {/* Info Cards */}
       <div className="grid md:grid-cols-3 gap-4 mt-6">

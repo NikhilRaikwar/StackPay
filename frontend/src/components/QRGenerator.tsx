@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { QRCodeCanvas } from 'qrcode.react';
 import { v4 as uuidv4 } from 'uuid';
 import { useWallet } from '../hooks/useWallet';
-import { createPaymentRequest, resolveStacksRecipient } from '../utils/stacksUtils';
+import { createPaymentRequest, createInvoiceRequest, resolveStacksRecipient, getUSDCxBalance } from '../utils/stacksUtils';
 import { buildPaymentUrl } from '../utils/qrUtils';
 import { usePayment } from '../hooks/usePayment';
 import { db, isFirebaseConfigured } from '../utils/firebase';
@@ -19,6 +19,19 @@ export const QRGenerator = () => {
   const [paymentId, setPaymentId] = useState('');
   const [loading, setLoading] = useState(false);
   const [recipientStatus, setRecipientStatus] = useState<'valid' | 'invalid' | 'checking' | 'idle'>('idle');
+  const [paymentType, setPaymentType] = useState<'escrow' | 'invoice'>('escrow');
+  const [balance, setBalance] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (address) {
+      getUSDCxBalance(address)
+        .then(setBalance)
+        .catch((e) => {
+          console.error("Failed to fetch balance", e);
+          setBalance(null);
+        });
+    }
+  }, [address]);
 
   useEffect(() => {
     const timer = setTimeout(async () => {
@@ -44,31 +57,44 @@ export const QRGenerator = () => {
   }, [recipient, address]);
 
   const generateQR = async () => {
-    if (!address || !amount || !recipient.trim()) return;
-    if (recipientStatus === 'invalid') {
-      alert('Invalid recipient.');
+    if (!address || !amount) return;
+    if (paymentType === 'escrow' && (!recipient.trim() || recipientStatus === 'invalid')) {
+      if (recipientStatus === 'invalid') alert('Invalid recipient.');
       return;
     }
 
     setLoading(true);
     try {
       const requestId = uuidv4();
-      const resolvedRecipient = await resolveStacksRecipient(recipient);
-      await createPaymentRequest(
-        requestId,
-        resolvedRecipient,
-        parseFloat(amount),
-        memo || 'Payment Request'
-      );
+      let resolvedRecipient = address;
+
+      if (paymentType === 'escrow') {
+        resolvedRecipient = await resolveStacksRecipient(recipient);
+        await createPaymentRequest(
+          requestId,
+          resolvedRecipient,
+          parseFloat(amount),
+          memo || 'Payment Request'
+        );
+      } else {
+        // Invoice logic
+        await createInvoiceRequest(
+          requestId,
+          parseFloat(amount),
+          memo || 'Invoice Request'
+        );
+      }
 
       const paymentUrl = buildPaymentUrl(requestId);
       setQrData(paymentUrl);
       setPaymentId(requestId);
+
+      // Update local state
       addPayment({
         id: requestId,
         amount: parseFloat(amount),
         recipient: resolvedRecipient,
-        memo: memo || 'Payment Request',
+        memo: memo || (paymentType === 'escrow' ? 'Payment Request' : 'Invoice Request'),
         status: 'pending',
         createdAt: new Date().toISOString(),
       });
@@ -78,10 +104,11 @@ export const QRGenerator = () => {
           await setDoc(doc(db, 'payments', requestId), {
             requestId,
             creator: address,
-            recipient: resolvedRecipient,
+            recipient: resolvedRecipient, // For invoice, this is the creator (me)
             amount: parseFloat(amount),
-            memo: memo || 'Payment Request',
+            memo: memo || (paymentType === 'escrow' ? 'Payment Request' : 'Invoice Request'),
             status: 'pending',
+            requestType: paymentType,
             qrCodeUrl: paymentUrl,
             createdAt: serverTimestamp(),
           });
@@ -135,41 +162,65 @@ export const QRGenerator = () => {
           </div>
 
           <div className="p-6 space-y-5">
-            {/* Recipient */}
-            <div>
-              <label className="block font-mono text-xs text-text-muted mb-2 tracking-wider">
-                RECIPIENT (WHO WILL SCAN THIS?)
-              </label>
-              <div className={`relative flex items-center bg-terminal-bg border rounded-lg transition-all duration-300 ${recipientStatus === 'valid' ? 'border-neon-green/50' :
-                recipientStatus === 'invalid' ? 'border-status-error/50' :
-                  'border-terminal-border focus-within:border-neon-cyan'
-                }`}>
-                <input
-                  type="text"
-                  value={recipient}
-                  onChange={(event) => setRecipient(event.target.value)}
-                  placeholder="@alice or ST2..."
-                  className="flex-1 bg-transparent !border-none !outline-none !ring-0 !shadow-none font-mono text-white placeholder-text-muted px-4 py-3"
-                  style={{ outline: 'none', boxShadow: 'none', border: 'none' }}
-                />
-                <div className="pr-4 flex items-center">
-                  {recipientStatus === 'checking' && (
-                    <div className="spinner w-4 h-4 border-2" />
-                  )}
-                  {recipientStatus === 'valid' && (
-                    <div className="group relative cursor-help">
-                      <span className="text-green-500 text-lg">✓</span>
-                      <div className="absolute bottom-full mb-2 right-0 hidden group-hover:block bg-black border border-terminal-border text-xs px-2 py-1 rounded whitespace-nowrap z-50">
-                        Valid Recipient
+            {/* Payment Type Toggle */}
+            <div className="flex p-1 bg-terminal-bg border border-terminal-border rounded-lg mb-6">
+              <button
+                onClick={() => setPaymentType('escrow')}
+                className={`flex-1 py-2 text-sm font-mono transition-all duration-300 rounded ${paymentType === 'escrow'
+                  ? 'bg-neon-magenta text-black font-bold shadow-[0_0_10px_rgba(255,0,255,0.3)]'
+                  : 'text-text-muted hover:text-white'
+                  }`}
+              >
+                SEND (ESCROW)
+              </button>
+              <button
+                onClick={() => setPaymentType('invoice')}
+                className={`flex-1 py-2 text-sm font-mono transition-all duration-300 rounded ${paymentType === 'invoice'
+                  ? 'bg-neon-cyan text-black font-bold shadow-[0_0_10px_rgba(0,255,255,0.3)]'
+                  : 'text-text-muted hover:text-white'
+                  }`}
+              >
+                REQUEST (INVOICE)
+              </button>
+            </div>
+
+            {/* Recipient - Only show for Escrow */}
+            {paymentType === 'escrow' && (
+              <div>
+                <label className="block font-mono text-xs text-text-muted mb-2 tracking-wider">
+                  RECIPIENT (WHO WILL SCAN THIS?)
+                </label>
+                <div className={`relative flex items-center bg-terminal-bg border rounded-lg transition-all duration-300 ${recipientStatus === 'valid' ? 'border-neon-green/50' :
+                  recipientStatus === 'invalid' ? 'border-status-error/50' :
+                    'border-terminal-border focus-within:border-neon-cyan'
+                  }`}>
+                  <input
+                    type="text"
+                    value={recipient}
+                    onChange={(event) => setRecipient(event.target.value)}
+                    placeholder="@alice or ST2..."
+                    className="flex-1 bg-transparent !border-none !outline-none !ring-0 !shadow-none font-mono text-white placeholder-text-muted px-4 py-3"
+                    style={{ outline: 'none', boxShadow: 'none', border: 'none' }}
+                  />
+                  <div className="pr-4 flex items-center">
+                    {recipientStatus === 'checking' && (
+                      <div className="spinner w-4 h-4 border-2" />
+                    )}
+                    {recipientStatus === 'valid' && (
+                      <div className="group relative cursor-help">
+                        <span className="text-green-500 text-lg">✓</span>
+                        <div className="absolute bottom-full mb-2 right-0 hidden group-hover:block bg-black border border-terminal-border text-xs px-2 py-1 rounded whitespace-nowrap z-50">
+                          Valid Recipient
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  {recipientStatus === 'invalid' && (
-                    <span className="text-red-500 text-lg">!</span>
-                  )}
+                    )}
+                    {recipientStatus === 'invalid' && (
+                      <span className="text-red-500 text-lg">!</span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Amount */}
             <div>
@@ -178,7 +229,7 @@ export const QRGenerator = () => {
                   AMOUNT (USDC)
                 </label>
                 <div className="text-xs text-neon-cyan/80 font-mono">
-                  Balance: -- USDC
+                  Balance: {balance !== null ? `$${balance.toFixed(2)}` : '--'} USDC
                 </div>
               </div>
               <div className="relative flex items-center bg-terminal-bg border border-terminal-border rounded-lg focus-within:border-neon-cyan transition-all duration-300">
@@ -214,10 +265,12 @@ export const QRGenerator = () => {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={generateQR}
-              disabled={loading || !recipient.trim() || !amount}
-              className={`w-full py-4 mt-2 rounded-lg font-display font-bold text-black uppercase tracking-wider transition-all duration-300 ${loading || !recipient.trim() || !amount
+              disabled={loading || (paymentType === 'escrow' && !recipient.trim()) || !amount}
+              className={`w-full py-4 mt-2 rounded-lg font-display font-bold text-black uppercase tracking-wider transition-all duration-300 ${loading || (paymentType === 'escrow' && !recipient.trim()) || !amount
                 ? 'bg-terminal-border cursor-not-allowed opacity-50'
-                : 'bg-neon-magenta hover:bg-neon-magenta/90 shadow-[0_0_20px_rgba(255,0,255,0.3)]'
+                : paymentType === 'escrow'
+                  ? 'bg-neon-magenta hover:bg-neon-magenta/90 shadow-[0_0_20px_rgba(255,0,255,0.3)]'
+                  : 'bg-neon-cyan hover:bg-neon-cyan/90 shadow-[0_0_20px_rgba(0,255,255,0.3)]'
                 }`}
             >
               {loading ? (
@@ -226,7 +279,7 @@ export const QRGenerator = () => {
                   <span>Processing...</span>
                 </div>
               ) : (
-                'CREATE PAYMENT LINK'
+                paymentType === 'escrow' ? 'CREATE PAYMENT LINK' : 'CREATE INVOICE LINK'
               )}
             </motion.button>
           </div>
@@ -268,7 +321,9 @@ export const QRGenerator = () => {
                   PAYMENT LINK READY
                 </h3>
                 <p className="text-sm text-text-muted font-mono">
-                  Amount locked in escrow. Share this code with the recipient.
+                  {paymentType === 'escrow'
+                    ? 'Amount locked in escrow. Share this code with the recipient.'
+                    : 'Invoice created. Share this code to get paid.'}
                 </p>
               </div>
 

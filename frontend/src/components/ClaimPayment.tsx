@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useWallet } from '../hooks/useWallet';
 import {
   claimPayment,
+  payInvoice,
   PAYMENT_CONTRACT_ADDRESS,
   PAYMENT_CONTRACT_NAME,
 } from '../utils/stacksUtils';
@@ -18,6 +19,7 @@ interface PaymentDetails {
   amount: number;
   memo: string;
   status: string;
+  requestType: string;
 }
 
 export const ClaimPayment = () => {
@@ -65,6 +67,7 @@ export const ClaimPayment = () => {
           amount: parseInt(data.amount.value, 10) / 1_000_000,
           memo: data.memo.value,
           status: data.status.value,
+          requestType: data['request-type'].value,
         });
       }
     } catch (error) {
@@ -96,6 +99,34 @@ export const ClaimPayment = () => {
     } catch (error) {
       console.error('Error claiming payment:', error);
       alert('Failed to claim payment');
+    } finally {
+      setClaiming(false);
+    }
+  };
+
+  const handlePay = async () => {
+    if (!address || !paymentId) return;
+
+    setClaiming(true);
+    if (!payment) return;
+    try {
+      await payInvoice(paymentId, payment.amount);
+
+      if (db && isFirebaseConfigured) {
+        try {
+          await updateDoc(doc(db, 'payments', paymentId), {
+            status: 'paid',
+            paidAt: new Date().toISOString(),
+            payer: address
+          });
+        } catch (firebaseError) {
+          console.warn('Firebase update failed:', firebaseError);
+        }
+      }
+      navigate('/history');
+    } catch (error) {
+      console.error('Error paying invoice:', error);
+      alert('Failed to pay invoice');
     } finally {
       setClaiming(false);
     }
@@ -147,7 +178,9 @@ export const ClaimPayment = () => {
               <span className="text-neon-green text-xl">⬇</span>
             </div>
             <div>
-              <h2 className="font-display font-bold text-lg text-white">INCOMING PAYMENT</h2>
+              <h2 className="font-display font-bold text-lg text-white">
+                {payment?.requestType === 'invoice' ? 'INVOICE REQUEST' : 'INCOMING PAYMENT'}
+              </h2>
               <p className="font-mono text-xs text-text-muted">Payment Request #{paymentId?.substring(0, 8)}</p>
             </div>
           </div>
@@ -160,7 +193,9 @@ export const ClaimPayment = () => {
             animate={{ scale: 1 }}
             className="p-8 bg-gradient-to-br from-neon-green/10 to-neon-cyan/5 rounded-xl border border-neon-green/30 text-center"
           >
-            <p className="font-mono text-xs text-text-muted mb-2">AMOUNT TO CLAIM</p>
+            <p className="font-mono text-xs text-text-muted mb-2">
+              {payment.requestType === 'invoice' ? 'AMOUNT TO PAY' : 'AMOUNT TO CLAIM'}
+            </p>
             <p className="font-display font-black text-5xl text-white amount-display">
               ${payment.amount.toFixed(2)}
             </p>
@@ -189,8 +224,8 @@ export const ClaimPayment = () => {
             <div className="p-4 bg-terminal-bg rounded-lg border border-terminal-border">
               <p className="font-mono text-xs text-text-muted mb-1">STATUS</p>
               <div className="flex items-center gap-2">
-                {payment.status === 'completed' ? (
-                  <span className="status-badge-completed">✓ COMPLETED</span>
+                {payment.status === 'completed' || payment.status === 'paid' ? (
+                  <span className="status-badge-completed">✓ {payment.status === 'paid' ? 'PAID' : 'COMPLETED'}</span>
                 ) : payment.status === 'pending' ? (
                   <span className="status-badge-pending">◎ PENDING</span>
                 ) : (
@@ -209,9 +244,9 @@ export const ClaimPayment = () => {
                 onClick={connectWallet}
                 className="w-full btn-neon-solid py-4 text-base"
               >
-                CONNECT WALLET TO CLAIM
+                CONNECT WALLET TO {payment.requestType === 'invoice' ? 'PAY' : 'CLAIM'}
               </motion.button>
-            ) : !isRecipient ? (
+            ) : !isRecipient && payment.requestType === 'escrow' ? (
               <div className="p-4 bg-status-warning/10 border border-status-warning/30 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-status-warning">⚠️</span>
@@ -221,10 +256,12 @@ export const ClaimPayment = () => {
                   This payment is intended for a different wallet address
                 </p>
               </div>
-            ) : payment.status === 'completed' ? (
+            ) : (payment.status === 'completed' || payment.status === 'paid') ? (
               <div className="p-4 bg-neon-green/10 border border-neon-green/30 rounded-lg text-center">
                 <span className="text-neon-green text-2xl">✓</span>
-                <p className="font-mono text-sm text-neon-green mt-2">PAYMENT ALREADY CLAIMED</p>
+                <p className="font-mono text-sm text-neon-green mt-2">
+                  {payment.status === 'paid' ? 'INVOICE ALREADY PAID' : 'PAYMENT ALREADY CLAIMED'}
+                </p>
               </div>
             ) : canClaim ? (
               <motion.button
@@ -247,6 +284,29 @@ export const ClaimPayment = () => {
                 )}
               </motion.button>
             ) : null}
+
+            {/* Pay Invoice Action */}
+            {isConnected && payment.requestType === 'invoice' && payment.status === 'pending' && (
+              <motion.button
+                whileHover={{ scale: claiming ? 1 : 1.02 }}
+                whileTap={{ scale: claiming ? 1 : 0.98 }}
+                onClick={handlePay}
+                disabled={claiming}
+                className="w-full btn-neon-cyan py-4 text-base flex items-center justify-center gap-3 mt-4"
+              >
+                {claiming ? (
+                  <>
+                    <span className="spinner" />
+                    PAYING...
+                  </>
+                ) : (
+                  <>
+                    <span>↗</span>
+                    PAY INVOICE ${payment.amount.toFixed(2)} USDCx
+                  </>
+                )}
+              </motion.button>
+            )}
           </div>
         </div>
       </motion.div>
