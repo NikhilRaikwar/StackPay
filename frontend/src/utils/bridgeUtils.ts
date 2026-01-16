@@ -1,4 +1,13 @@
-import { ethers } from 'ethers';
+import {
+  createWalletClient,
+  createPublicClient,
+  custom,
+  http,
+  parseUnits,
+  type Hash
+} from 'viem';
+import { sepolia } from 'viem/chains';
+import { bytes32FromBytes, remoteRecipientCoder } from './bridgeHelpers';
 
 // xReserve contract details (Ethereum Sepolia Testnet)
 export const XRESERVE_ADDRESS =
@@ -9,16 +18,51 @@ export const STACKS_DOMAIN =
   import.meta.env.VITE_STACKS_DOMAIN || '10003';
 
 export const XRESERVE_ABI = [
-  'function deposit(uint256 amount, string stacksAddress) public payable',
-  'function getBridgeStatus(bytes32 txHash) public view returns (string)',
-];
+  {
+    name: "depositToRemote",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "value", type: "uint256" },
+      { name: "remoteDomain", type: "uint32" },
+      { name: "remoteRecipient", type: "bytes32" },
+      { name: "localToken", type: "address" },
+      { name: "maxFee", type: "uint256" },
+      { name: "hookData", type: "bytes" },
+    ],
+    outputs: [],
+  },
+] as const;
 
 const ERC20_ABI = [
-  'function approve(address spender, uint256 amount) public returns (bool)',
-  'function allowance(address owner, address spender) public view returns (uint256)',
-  'function decimals() public view returns (uint8)',
-  'function balanceOf(address owner) public view returns (uint256)',
-];
+  {
+    name: "approve",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "spender", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "success", type: "bool" }],
+  },
+  {
+    name: "allowance",
+    type: "function",
+    stateMutability: "view",
+    inputs: [
+      { name: "owner", type: "address" },
+      { name: "spender", type: "address" }
+    ],
+    outputs: [{ name: "allowance", type: "uint256" }],
+  },
+  {
+    name: "balanceOf",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "balance", type: "uint256" }],
+  },
+] as const;
 
 export const bridgeUSDCFromEthereum = async (
   amount: number,
@@ -34,66 +78,117 @@ export const bridgeUSDCFromEthereum = async (
     throw new Error('MetaMask not installed');
   }
 
-  const provider = new ethers.providers.Web3Provider(window.ethereum);
-  await provider.send('eth_requestAccounts', []);
-  const network = await provider.getNetwork();
-  if (network.chainId !== 11155111) {
-    throw new Error('Please switch MetaMask to Sepolia.');
-  }
-  const signer = provider.getSigner();
-
-  if (amount < 10) {
-    throw new Error('Minimum bridge amount is 10 USDC.');
-  }
-  const amountInWei = ethers.utils.parseUnits(amount.toString(), 6);
-
-  const usdcContract = new ethers.Contract(
-    USDC_CONTRACT_ADDRESS,
-    ERC20_ABI,
-    signer
-  );
-  const signerAddress = await signer.getAddress();
-  const balance: ethers.BigNumber = await usdcContract.balanceOf(signerAddress);
-  if (balance.lt(amountInWei)) {
-    throw new Error('Insufficient USDC balance on Sepolia.');
-  }
-  const currentAllowance: ethers.BigNumber = await usdcContract.allowance(
-    signerAddress,
-    XRESERVE_ADDRESS
-  );
-
-  if (currentAllowance.lt(amountInWei)) {
-    const approveTx = await usdcContract.approve(XRESERVE_ADDRESS, amountInWei);
-    await approveTx.wait();
-  }
-
-  const xReserveContract = new ethers.Contract(
-    XRESERVE_ADDRESS,
-    XRESERVE_ABI,
-    signer
-  );
-
-  const tx = await xReserveContract.deposit(amountInWei, stacksAddress, {
-    value: ethers.utils.parseEther('0.01'),
+  const walletClient = createWalletClient({
+    chain: sepolia,
+    transport: custom(window.ethereum)
   });
 
-  await tx.wait();
-  return tx.hash as string;
+  const publicClient = createPublicClient({
+    chain: sepolia,
+    transport: custom(window.ethereum)
+  });
+
+  const [address] = await walletClient.requestAddresses();
+  const chainId = await walletClient.getChainId();
+
+  if (chainId !== 11155111) {
+    // Attempt to switch chain
+    try {
+      await walletClient.switchChain({ id: sepolia.id });
+    } catch (e) {
+      throw new Error('Please switch MetaMask to Sepolia.');
+    }
+  }
+
+  if (amount < 1) {
+    throw new Error('Minimum bridge amount is 1 USDC.');
+  }
+
+  // Prepare deposit params (USDC has 6 decimals)
+  const amountInUnits = parseUnits(amount.toString(), 6);
+  const maxFee = parseUnits('0', 6);
+  const hookData = "0x";
+
+  // Encode Stacks recipient
+  const remoteRecipient = bytes32FromBytes(remoteRecipientCoder.encode(stacksAddress));
+
+  // Check balance
+  const balance = await publicClient.readContract({
+    address: USDC_CONTRACT_ADDRESS as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: 'balanceOf',
+    args: [address]
+  });
+
+  if (balance < amountInUnits) {
+    throw new Error('Insufficient USDC balance on Sepolia.');
+  }
+
+  // Check allowance
+  const allowance = await publicClient.readContract({
+    address: USDC_CONTRACT_ADDRESS as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: 'allowance',
+    args: [address, XRESERVE_ADDRESS as `0x${string}`]
+  });
+
+  if (allowance < amountInUnits) {
+    const hash = await walletClient.writeContract({
+      address: USDC_CONTRACT_ADDRESS as `0x${string}`,
+      abi: ERC20_ABI,
+      functionName: 'approve',
+      args: [XRESERVE_ADDRESS as `0x${string}`, amountInUnits],
+      account: address
+    });
+
+    await publicClient.waitForTransactionReceipt({ hash });
+  }
+
+  // Deposit
+  const txHash = await walletClient.writeContract({
+    address: XRESERVE_ADDRESS as `0x${string}`,
+    abi: XRESERVE_ABI,
+    functionName: 'depositToRemote',
+    args: [
+      amountInUnits,
+      parseInt(STACKS_DOMAIN), // STACKS_DOMAIN is string '10003'
+      remoteRecipient,
+      USDC_CONTRACT_ADDRESS as `0x${string}`,
+      maxFee,
+      hookData
+    ],
+    account: address
+  });
+
+  await publicClient.waitForTransactionReceipt({ hash: txHash });
+  return txHash;
 };
 
 export const monitorBridgeStatus = async (
   txHash: string
 ): Promise<'pending' | 'completed' | 'failed'> => {
-  const response = await fetch(
-    `https://api.testnet.hiro.so/bridge/status/${txHash}`
-  );
+  try {
+    // Use a reliable public RPC for reading transaction status
+    const publicClient = createPublicClient({
+      chain: sepolia,
+      transport: http('https://ethereum-sepolia.publicnode.com')
+    });
 
-  if (!response.ok) {
+    const receipt = await publicClient.getTransactionReceipt({
+      hash: txHash as `0x${string}`,
+    });
+
+    if (receipt.status === 'success') {
+      return 'completed';
+    } else if (receipt.status === 'reverted') {
+      return 'failed';
+    }
+
+    return 'pending';
+  } catch (error) {
+    // TransactionReceiptNotFoundError or other errors likely mean it's still pending
     return 'pending';
   }
-
-  const data = await response.json();
-  return data.status ?? 'pending';
 };
 
 export const pollBridgeStatus = (

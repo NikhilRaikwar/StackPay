@@ -22,7 +22,7 @@ export const USDCX_ASSET_NAME = 'usdcx-token';
 
 // Your deployed contracts (update after deployment)
 export const PAYMENT_CONTRACT_ADDRESS = 'ST2Y455NJPETB2SRSD0VDZP3KJE50WNHY0BN3TWY5';
-export const PAYMENT_CONTRACT_NAME = 'payment-requests';
+export const PAYMENT_CONTRACT_NAME = 'payment-requests-v3';
 export const USERNAME_CONTRACT_ADDRESS =
   'ST2Y455NJPETB2SRSD0VDZP3KJE50WNHY0BN3TWY5';
 export const USERNAME_CONTRACT_NAME = 'username-registry';
@@ -156,6 +156,118 @@ export const createPaymentRequest = async (
 
     void openContractCall(options);
   });
+
+export const createInvoiceRequest = async (
+  requestId: string,
+  amount: number,
+  memo: string
+) =>
+  new Promise<string>((resolve, reject) => {
+    const amountInMicroUnits = Math.floor(amount * 1_000_000);
+
+    const options = {
+      contractAddress: PAYMENT_CONTRACT_ADDRESS,
+      contractName: PAYMENT_CONTRACT_NAME,
+      functionName: 'create-invoice-request',
+      functionArgs: [
+        stringAsciiCV(requestId),
+        uintCV(amountInMicroUnits),
+        stringUtf8CV(memo),
+      ],
+      network,
+      onFinish: (data: any) => resolve(data.txId as string),
+      onCancel: () => reject(new Error('Transaction canceled')),
+    };
+
+    void openContractCall(options);
+  });
+
+export const payInvoice = async (
+  requestId: string,
+  amount: number
+) =>
+  new Promise<string>((resolve, reject) => {
+    const amountInMicroUnits = Math.floor(amount * 1_000_000);
+    const userAddress =
+      network.client.baseUrl === 'https://api.mainnet.hiro.so'
+        ? JSON.parse(localStorage.getItem('blockstack-session') || '{}')
+          ?.userData?.profile?.stxAddress?.mainnet
+        : JSON.parse(localStorage.getItem('blockstack-session') || '{}')
+          ?.userData?.profile?.stxAddress?.testnet;
+
+    if (!userAddress) {
+      reject(new Error('User address not found'));
+      return;
+    }
+
+    // Post condition: Payer sends USDCx to Creator
+    const postConditions = [
+      Pc.principal(userAddress)
+        .willSendEq(amountInMicroUnits)
+        .ft(
+          `${USDCX_CONTRACT_ADDRESS}.${USDCX_CONTRACT_NAME}`,
+          USDCX_ASSET_NAME
+        ),
+    ];
+
+    const options = {
+      contractAddress: PAYMENT_CONTRACT_ADDRESS,
+      contractName: PAYMENT_CONTRACT_NAME,
+      functionName: 'pay-invoice',
+      functionArgs: [stringAsciiCV(requestId)],
+      network,
+      postConditions,
+      onFinish: (data: any) => resolve(data.txId as string),
+      onCancel: () => reject(new Error('Transaction canceled')),
+    };
+
+    void openContractCall(options);
+  });
+
+export const cancelPaymentRequest = async (requestId: string) =>
+  new Promise<string>((resolve, reject) => {
+    const options = {
+      contractAddress: PAYMENT_CONTRACT_ADDRESS,
+      contractName: PAYMENT_CONTRACT_NAME,
+      functionName: 'cancel-payment-request',
+      functionArgs: [stringAsciiCV(requestId)],
+      network,
+      onFinish: (data: any) => resolve(data.txId as string),
+      onCancel: () => reject(new Error('Transaction canceled')),
+    };
+
+    void openContractCall(options);
+  });
+
+export const getPaymentRequest = async (requestId: string) => {
+  const response = await fetch(
+    `${stacksApiUrl}/v2/contracts/call-read/${PAYMENT_CONTRACT_ADDRESS}/${PAYMENT_CONTRACT_NAME}/get-payment-request`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sender: PAYMENT_CONTRACT_ADDRESS,
+        arguments: [`0x${serializeCV(stringAsciiCV(requestId))}`],
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch payment request.');
+  }
+  const result = await response.json();
+  if (!result.okay) {
+    return null;
+  }
+
+  const clarityValue = deserializeCV(result.result);
+  const jsonResult = cvToJSON(clarityValue);
+
+  // If result is none (null in JSON), return null
+  if (jsonResult.value === null) return null;
+
+  return jsonResult.value;
+};
 
 export const claimPayment = async (
   requestId: string,

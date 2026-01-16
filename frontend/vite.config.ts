@@ -14,4 +14,13 @@ export default defineConfig({
       protocolImports: true,
     }),
   ],
+  server: {
+    proxy: {
+      '/api/bridge': {
+        target: 'https://api.testnet.hiro.so',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/bridge/, '/bridge'),
+      },
+    },
+  },
 });
