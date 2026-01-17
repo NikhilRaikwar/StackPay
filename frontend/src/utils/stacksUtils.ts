@@ -60,7 +60,7 @@ export const resolveStacksRecipient = async (input: string) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sender: USERNAME_CONTRACT_ADDRESS,
-        arguments: [`0x${typeof serializeCV(stringAsciiCV(username)) === 'string' ? serializeCV(stringAsciiCV(username)) : bytesToHex(serializeCV(stringAsciiCV(username)) as Uint8Array)}`],
+        arguments: [`0x${typeof serializeCV(stringAsciiCV(username)) === 'string' ? serializeCV(stringAsciiCV(username)) : bytesToHex(serializeCV(stringAsciiCV(username)) as any)}`],
       }),
     }
   );
@@ -258,7 +258,7 @@ export const getPaymentRequest = async (requestId: string) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sender: PAYMENT_CONTRACT_ADDRESS,
-        arguments: [`0x${typeof serializeCV(stringAsciiCV(requestId)) === 'string' ? serializeCV(stringAsciiCV(requestId)) : bytesToHex(serializeCV(stringAsciiCV(requestId)) as Uint8Array)}`],
+        arguments: [`0x${typeof serializeCV(stringAsciiCV(requestId)) === 'string' ? serializeCV(stringAsciiCV(requestId)) : bytesToHex(serializeCV(stringAsciiCV(requestId)) as any)}`],
       }),
     }
   );

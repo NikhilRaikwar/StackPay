@@ -96,7 +96,7 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     try {
-      const accounts = await window.ethereum.request({
+      const accounts = await (window.ethereum as any).request({
         method: 'eth_requestAccounts',
       });
       setEthAddress(accounts[0] ?? null);
