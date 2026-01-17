@@ -10,6 +10,7 @@ import { BridgeInterface } from './components/BridgeInterface';
 import { PaymentHistory } from './components/PaymentHistory';
 import { QRScanner } from './components/QRScanner';
 import { UsernameRegistry } from './components/UsernameRegistry';
+import { ContractDebug } from './components/ContractDebug';
 import { useWallet } from './hooks/useWallet';
 
 const navLinks = [
@@ -55,8 +56,8 @@ function Navigation() {
                     key={link.path}
                     to={link.path}
                     className={`relative px-4 py-2 font-mono text-sm tracking-wider transition-all duration-300 ${isActive
-                        ? 'text-neon-cyan'
-                        : 'text-text-secondary hover:text-white'
+                      ? 'text-neon-cyan'
+                      : 'text-text-secondary hover:text-white'
                       }`}
                   >
                     <span className="mr-2 opacity-50">{link.icon}</span>
@@ -88,8 +89,8 @@ function Navigation() {
                   key={link.path}
                   to={link.path}
                   className={`flex-shrink-0 px-3 py-1.5 rounded-full font-mono text-xs tracking-wider transition-all duration-300 ${isActive
-                      ? 'bg-neon-cyan text-terminal-bg'
-                      : 'bg-terminal-card text-text-secondary border border-terminal-border'
+                    ? 'bg-neon-cyan text-terminal-bg'
+                    : 'bg-terminal-card text-text-secondary border border-terminal-border'
                     }`}
                 >
                   <span className="mr-1">{link.icon}</span>
@@ -118,6 +119,7 @@ function AnimatedRoutes() {
         <Route path="/username" element={<PageWrapper><UsernameRegistry /></PageWrapper>} />
         <Route path="/pay/:paymentId" element={<PageWrapper><ClaimPayment /></PageWrapper>} />
         <Route path="/history" element={<PageWrapper><PaymentHistory /></PageWrapper>} />
+        <Route path="/debug" element={<PageWrapper><ContractDebug /></PageWrapper>} />
       </Routes>
     </AnimatePresence>
   );
