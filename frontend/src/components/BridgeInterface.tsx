@@ -299,6 +299,11 @@ export const BridgeInterface = () => {
                     }`}>
                     {bridgeStatus.toUpperCase()}
                   </p>
+                  {bridgeStatus === 'completed' && (
+                    <p className="font-mono text-xs text-neon-green mt-2">
+                      Bridging process was done, the USDCx token amount will be received in a few mins due to bridging.
+                    </p>
+                  )}
                 </div>
 
                 {/* TX Hash */}
