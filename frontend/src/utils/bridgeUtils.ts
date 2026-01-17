@@ -4,6 +4,7 @@ import {
   custom,
   http,
   parseUnits,
+  type Hash
 } from 'viem';
 import { sepolia } from 'viem/chains';
 import { bytes32FromBytes, remoteRecipientCoder } from './bridgeHelpers';
@@ -79,12 +80,12 @@ export const bridgeUSDCFromEthereum = async (
 
   const walletClient = createWalletClient({
     chain: sepolia,
-    transport: custom(window.ethereum as { request: (...args: unknown[]) => Promise<unknown> })
+    transport: custom(window.ethereum)
   });
 
   const publicClient = createPublicClient({
     chain: sepolia,
-    transport: custom(window.ethereum as { request: (...args: unknown[]) => Promise<unknown> })
+    transport: custom(window.ethereum)
   });
 
   const [address] = await walletClient.requestAddresses();
