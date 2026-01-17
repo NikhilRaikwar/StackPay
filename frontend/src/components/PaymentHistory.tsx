@@ -12,7 +12,8 @@ import {
   USERNAME_CONTRACT_ADDRESS,
   USERNAME_CONTRACT_NAME
 } from '../utils/stacksUtils';
-import { standardPrincipalCV, cvToJSON, deserializeCV, serializeCV } from '@stacks/transactions';
+import { callReadOnlyFunction } from '../utils/stacksApi';
+import { standardPrincipalCV, cvToJSON, deserializeCV, serializeCV, stringAsciiCV } from '@stacks/transactions';
 import { STACKS_TESTNET } from '@stacks/network';
 import { db, isFirebaseConfigured } from '../utils/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
@@ -148,6 +149,10 @@ export const PaymentHistory = () => {
         }
       }
     };
+
+
+
+
 
     const fetchTransactions = async () => {
       if (!address) {
@@ -337,6 +342,64 @@ export const PaymentHistory = () => {
     void fetchTransactions();
   }, [address]);
 
+  // Separate effect to verify statuses against contract
+  useEffect(() => {
+    if (transactions.length === 0) return;
+
+    const verifyContractStatuses = async () => {
+      const candidates = transactions.filter(t => t.status === 'pending');
+      // Only check items that look like they have a request ID (not standard tx IDs which are 66 chars)
+      // Our generated IDs are UUIDs (36 chars) or shorter.
+      const requestIds = candidates.filter(t => t.id.length < 60).map(t => t.id);
+
+      if (requestIds.length === 0) return;
+
+      const updates: Record<string, string> = {};
+
+      const checkPromises = requestIds.map(async (rid) => {
+        try {
+          const res = await callReadOnlyFunction(
+            PAYMENT_CONTRACT_ADDRESS,
+            PAYMENT_CONTRACT_NAME,
+            'get-payment-status',
+            address || PAYMENT_CONTRACT_ADDRESS, // sender
+            [`0x${serializeCV(stringAsciiCV(rid))}`]
+          );
+
+          if (res.okay && res.result) {
+            const val = deserializeCV(res.result);
+            // Expecting (ok "pending") or (ok "completed") etc.
+            // or error if not found.
+            // If we get an error (err u404), it might mean it doesn't exist (yet?).
+            const json = cvToJSON(val);
+            if (json.value && json.value.value) {
+              // If response is (ok "status")
+              const status = json.value.value;
+              if (status && typeof status === 'string' && status !== 'pending') {
+                updates[rid] = status;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn(`Failed to verify status for ${rid}`, e);
+        }
+      });
+
+      await Promise.all(checkPromises);
+
+      if (Object.keys(updates).length > 0) {
+        setTransactions(prev => prev.map(t => {
+          if (updates[t.id]) {
+            return { ...t, status: updates[t.id] as any };
+          }
+          return t;
+        }));
+      }
+    };
+
+    void verifyContractStatuses();
+  }, [transactions.length, address]);
+
   const handleCancel = async (requestId: string) => {
     if (!requestId) return;
     try {
@@ -499,7 +562,7 @@ export const PaymentHistory = () => {
           ].map((stat) => (
             <div key={stat.label} className="p-4 text-center border-r last:border-r-0 border-terminal-border">
               <p className={`font-display font-bold text-lg text-neon-${stat.color}`}>{stat.value}</p>
-              <p className="font-mono text-[10px] text-text-muted">{stat.label}</p>
+              <p className="font-mono text-xs text-text-muted">{stat.label}</p>
             </div>
           ))}
         </div>

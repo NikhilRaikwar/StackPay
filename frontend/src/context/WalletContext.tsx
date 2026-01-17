@@ -51,7 +51,7 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('Wallet connection finished', response);
 
       if (response.addresses && response.addresses.length > 0) {
-        const stxAddressData = response.addresses.find((a) => a.symbol === 'STX') || response.addresses[0];
+        const stxAddressData = response.addresses.find(a => a.symbol === 'STX') || response.addresses[0];
         const address = stxAddressData.address;
 
         const mockUserData = {
@@ -96,7 +96,7 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     try {
-      const accounts = await (window.ethereum as { request: (args: { method: string }) => Promise<string[]> }).request({
+      const accounts = await (window.ethereum as any).request({
         method: 'eth_requestAccounts',
       });
       setEthAddress(accounts[0] ?? null);

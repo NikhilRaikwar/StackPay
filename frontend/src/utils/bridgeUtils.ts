@@ -79,12 +79,12 @@ export const bridgeUSDCFromEthereum = async (
 
   const walletClient = createWalletClient({
     chain: sepolia,
-    transport: custom(window.ethereum as { request: (...args: unknown[]) => Promise<unknown> })
+    transport: custom(window.ethereum as any)
   });
 
   const publicClient = createPublicClient({
     chain: sepolia,
-    transport: custom(window.ethereum as { request: (...args: unknown[]) => Promise<unknown> })
+    transport: custom(window.ethereum as any)
   });
 
   const [address] = await walletClient.requestAddresses();

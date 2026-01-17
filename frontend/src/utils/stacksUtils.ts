@@ -32,10 +32,7 @@ const stacksApiUrl =
   STACKS_TESTNET.client.baseUrl ?? 'https://api.testnet.hiro.so';
 
 
-function bytesToHex(bytes: Uint8Array | string): string {
-  if (typeof bytes === 'string') {
-    return bytes;
-  }
+function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes)
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
@@ -63,7 +60,7 @@ export const resolveStacksRecipient = async (input: string) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sender: USERNAME_CONTRACT_ADDRESS,
-        arguments: [`0x${bytesToHex(serializeCV(stringAsciiCV(username)))}`],
+        arguments: [`0x${typeof serializeCV(stringAsciiCV(username)) === 'string' ? serializeCV(stringAsciiCV(username)) : bytesToHex(serializeCV(stringAsciiCV(username)) as any)}`],
       }),
     }
   );
@@ -261,7 +258,7 @@ export const getPaymentRequest = async (requestId: string) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sender: PAYMENT_CONTRACT_ADDRESS,
-        arguments: [`0x${bytesToHex(serializeCV(stringAsciiCV(requestId)))}`],
+        arguments: [`0x${typeof serializeCV(stringAsciiCV(requestId)) === 'string' ? serializeCV(stringAsciiCV(requestId)) : bytesToHex(serializeCV(stringAsciiCV(requestId)) as any)}`],
       }),
     }
   );
