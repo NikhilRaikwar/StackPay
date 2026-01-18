@@ -13,6 +13,7 @@ StacksPay Pro revolutionizes peer-to-peer payments on the Stacks blockchain. By 
 -   **🆔 Username Integration**: Say goodbye to long addresses. Send crypto directly to BNS `@usernames` (automatically resolves to Stacks addresses).
 -   **📜 Payment History**: Keep track of your financial life. Monitor sent, received, and pending payments with real-time status updates powered by Firebase.
 -   **🌉 Bridge Integration**: Seamlessly bridge USDC from Ethereum to Stacks directly within the app.
+-   **🛠️ Contract Debugger**: Built-in tool to interact with Stacks smart contracts, call read-only functions, and inspect contract state directly from the UI.
 
 ---
 
@@ -73,6 +74,8 @@ NEXT_PUBLIC_STACKS_NETWORK=testnet
     *   `src/components/QRGenerator.tsx` 🔳 - Locks funds & generates payment codes.
     *   `src/components/ClaimPayment.tsx` 📥 - Recipient claiming logic.
     *   `src/components/PaymentHistory.tsx` 🕒 - Transaction history & status.
+    *   `src/components/ContractDebug.tsx` 🐛 - Interface for testing smart contract calls.
+    *   `src/utils/stacksApi.ts` 🔌 - Wrapper for Stacks Node API endpoints.
 
 ---
 
