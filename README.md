@@ -161,32 +161,38 @@ sequenceDiagram
 ### Username Transfer
 *Register and send payments using @usernames instead of complex addresses*
 
-![Username Registry](./screenshots/username-transfer.png)
+<img width="1301" height="732" alt="image" src="https://github.com/user-attachments/assets/dc6f5ea9-638d-4422-9802-855de5160637" />
+
 
 ### QR Scan Payment
 *Scan QR codes to instantly claim escrowed payments*
 
-![QR Scanner](./screenshots/qr-scan.png)
+<img width="1293" height="848" alt="image" src="https://github.com/user-attachments/assets/3b547dc4-15fe-421c-8599-7250095de406" />
+
 
 ### Bridge Transfer
 *Bridge USDC from Ethereum to Stacks as USDCx*
 
-![Bridge Interface](./screenshots/bridge-transfer.png)
+<img width="1920" height="1707" alt="screencapture-stackspay-pro-vercel-app-bridge-2026-01-19-21_45_46" src="https://github.com/user-attachments/assets/e028704b-5a7b-4689-ad9a-673c5e746491" />
+
 
 ### P2P Transfer
 *Direct peer-to-peer USDCx transfers with real-time validation*
 
-![P2P Transfer](./screenshots/p2p-transfer.png)
+<img width="1323" height="840" alt="image" src="https://github.com/user-attachments/assets/2d9585a2-4892-49ac-9986-c27a81e87045" />
+
 
 ### Escrow Created
 *Secure payment requests with funds locked in smart contract*
 
-![Escrow Created](./screenshots/escrow-created.png)
+<img width="1332" height="843" alt="image" src="https://github.com/user-attachments/assets/78454267-e044-459d-a1e6-8fa18807b31e" />
+
 
 ### Invoice
 *Create payment invoices for others to fulfill*
 
-![Invoice](./screenshots/invoice.png)
+<img width="1280" height="855" alt="image" src="https://github.com/user-attachments/assets/4593465d-8e08-495b-a82b-f267377bfb30" />
+
 
 ---
 
@@ -315,7 +321,7 @@ VITE_FIREBASE_APP_ID=your_app_id
 
 - [USDCx Bridging Guide](https://docs.stacks.co/more-guides/bridging-usdcx)
 - [Stacks Documentation](https://docs.stacks.co/)
-- [Clarity Language Reference](https://docs.stacks.co/clarity/)
+- [Clarinet Contracts](https://docs.stacks.co/clarinet/overview)
 - [Circle xReserve Protocol](https://www.circle.com/)
 - [Hackathon Community (Skool)](https://www.skool.com/stackers/about)
 
