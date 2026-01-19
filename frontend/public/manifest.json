@@ -1,6 +1,6 @@
 {
-  "name": "StacksPay Pro",
-  "short_name": "StacksPay",
+  "name": "StackPay",
+  "short_name": "StackPay",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0a0f",
