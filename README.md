@@ -275,15 +275,12 @@ VITE_FIREBASE_APP_ID=your_app_id
 
 ---
 
-## Smart Contracts
-
-### Deployed Contracts (Testnet)
-
-| Contract | Address | Purpose |
-|----------|---------|---------|
-| USDCx Token | `ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.usdcx` | Bridged stablecoin |
-| Payment Requests | See `stacksUtils.ts` | Escrow & Invoice logic |
-| Username Registry | See `stacksUtils.ts` | On-chain identity |
+## 📜 Smart Contracts (Testnet)
+ 
+| Contract | Explorer Link |
+|----------|---------------|
+| 📄 **payment-requests-v9** | [View on Explorer](https://explorer.hiro.so/txid/ST2Y455NJPETB2SRSD0VDZP3KJE50WNHY0BN3TWY5.payment-requests-v9?chain=testnet) |
+| 📄 **username-registry** | [View on Explorer](https://explorer.hiro.so/txid/ST2Y455NJPETB2SRSD0VDZP3KJE50WNHY0BN3TWY5.username-registry?chain=testnet) |
 
 ### Contract Functions
 
