@@ -1,5 +1,5 @@
-
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import {
     getContractInterface,
     getContractSource,
@@ -18,7 +18,6 @@ export const ContractDebug = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Inputs for testing
     const [mapId, setMapId] = useState('');
     const [mapKey, setMapKey] = useState('');
     const [fnName, setFnName] = useState('get-total-payments-created');
@@ -42,162 +41,205 @@ export const ContractDebug = () => {
         return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
     };
 
+    const tabs = [
+        { id: 'info', label: 'Interface' },
+        { id: 'source', label: 'Source' },
+        { id: 'maps', label: 'Maps' },
+        { id: 'vars', label: 'Variables' },
+        { id: 'read', label: 'Read-Only' },
+        { id: 'fast-read', label: 'Fast Call' },
+    ];
+
     return (
-        <div className="terminal-card p-6 max-w-4xl mx-auto mt-10">
-            <h2 className="text-xl font-bold text-neon-green mb-4">Contract API Debugger</h2>
-            <div className="mb-4">
-                <p className="text-xs font-mono text-text-muted">Target: {PAYMENT_CONTRACT_ADDRESS}.{PAYMENT_CONTRACT_NAME}</p>
-            </div>
-
-            <div className="flex flex-wrap gap-2 mb-6 border-b border-terminal-border pb-4">
-                {['info', 'source', 'maps', 'vars', 'read', 'fast-read'].map(tab => (
-                    <button
-                        key={tab}
-                        onClick={() => setActiveTab(tab)}
-                        className={`px-3 py-1 text-sm font-mono rounded ${activeTab === tab ? 'bg-neon-cyan text-terminal-bg' : 'bg-terminal-card border border-terminal-border text-text-muted'
-                            }`}
-                    >
-                        {tab.toUpperCase()}
-                    </button>
-                ))}
-            </div>
-
-            <div className="space-y-4">
-                {activeTab === 'info' && (
-                    <button
-                        onClick={() => handleApiCall(() => getContractInterface(PAYMENT_CONTRACT_ADDRESS, PAYMENT_CONTRACT_NAME))}
-                        className="btn-neon text-xs px-4 py-2"
-                    >
-                        Fetch Interface
-                    </button>
-                )}
-
-                {activeTab === 'source' && (
-                    <button
-                        onClick={() => handleApiCall(() => getContractSource(PAYMENT_CONTRACT_ADDRESS, PAYMENT_CONTRACT_NAME))}
-                        className="btn-neon text-xs px-4 py-2"
-                    >
-                        Fetch Source Code
-                    </button>
-                )}
-
-                {activeTab === 'maps' && (
-                    <div className="space-y-2">
-                        <input
-                            className="w-full bg-terminal-bg border border-terminal-border p-2 text-sm text-white font-mono placeholder:text-text-muted/50 focus:border-neon-cyan outline-none rounded"
-                            placeholder="Map Name (e.g., payment-requests)"
-                            value={mapId}
-                            onChange={e => setMapId(e.target.value)}
-                        />
-                        <input
-                            className="w-full bg-terminal-bg border border-terminal-border p-2 text-sm text-white font-mono placeholder:text-text-muted/50 focus:border-neon-cyan outline-none rounded"
-                            placeholder="Key (String ASCII)"
-                            value={mapKey}
-                            onChange={e => setMapKey(e.target.value)}
-                        />
-                        <button
-                            onClick={() => handleApiCall(async () => {
-                                // Assuming key is string-ascii for this demo
-                                const val = serializeCV(stringAsciiCV(mapKey));
-                                const serializedKey = typeof val === 'string' ? val : bytesToHex(val);
-                                const hexKey = `0x${serializedKey}`;
-                                return getMapEntry(PAYMENT_CONTRACT_ADDRESS, PAYMENT_CONTRACT_NAME, mapId || 'payment-requests', hexKey);
-                            })}
-                            className="btn-neon text-xs px-4 py-2"
-                        >
-                            Fetch Map Entry
-                        </button>
+        <div className="max-w-4xl mx-auto">
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="card-premium p-0 overflow-hidden"
+            >
+                {/* Header */}
+                <div className="p-8 border-b border-app-border bg-slate-50">
+                    <h2 className="font-serif text-4xl mb-1">Debug</h2>
+                    <p className="text-sm text-text-pale font-medium uppercase tracking-widest">Contract API Explorer</p>
+                    <div className="mt-4 p-3 bg-white border border-app-border rounded-xl">
+                        <p className="text-[10px] font-bold text-text-pale uppercase tracking-widest mb-1">Target Contract</p>
+                        <p className="text-xs font-mono text-text-dim break-all">{PAYMENT_CONTRACT_ADDRESS}.{PAYMENT_CONTRACT_NAME}</p>
                     </div>
-                )}
+                </div>
 
-                {activeTab === 'vars' && (
-                    <div className="space-y-2">
-                        <div className="flex gap-2">
+                {/* Tabs */}
+                <div className="p-4 border-b border-app-border flex flex-wrap gap-2">
+                    {tabs.map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`px-4 py-2 text-xs font-bold rounded-xl transition-all duration-300 ${activeTab === tab.id
+                                ? 'bg-accent-indigo text-white shadow-premium'
+                                : 'bg-white text-text-dim border border-app-border hover:bg-app-hover'
+                                }`}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Content */}
+                <div className="p-8 space-y-6">
+                    {activeTab === 'info' && (
+                        <button
+                            onClick={() => handleApiCall(() => getContractInterface(PAYMENT_CONTRACT_ADDRESS, PAYMENT_CONTRACT_NAME))}
+                            className="btn-primary"
+                        >
+                            Fetch Interface
+                        </button>
+                    )}
+
+                    {activeTab === 'source' && (
+                        <button
+                            onClick={() => handleApiCall(() => getContractSource(PAYMENT_CONTRACT_ADDRESS, PAYMENT_CONTRACT_NAME))}
+                            className="btn-primary"
+                        >
+                            Fetch Source Code
+                        </button>
+                    )}
+
+                    {activeTab === 'maps' && (
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-text-pale uppercase tracking-widest">Map Name</label>
+                                <input
+                                    className="input-premium"
+                                    placeholder="e.g., payment-requests"
+                                    value={mapId}
+                                    onChange={e => setMapId(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-text-pale uppercase tracking-widest">Key (String ASCII)</label>
+                                <input
+                                    className="input-premium"
+                                    placeholder="Enter key"
+                                    value={mapKey}
+                                    onChange={e => setMapKey(e.target.value)}
+                                />
+                            </div>
+                            <button
+                                onClick={() => handleApiCall(async () => {
+                                    const val = serializeCV(stringAsciiCV(mapKey));
+                                    const serializedKey = typeof val === 'string' ? val : bytesToHex(val);
+                                    const hexKey = `0x${serializedKey}`;
+                                    return getMapEntry(PAYMENT_CONTRACT_ADDRESS, PAYMENT_CONTRACT_NAME, mapId || 'payment-requests', hexKey);
+                                })}
+                                className="btn-primary"
+                            >
+                                Fetch Map Entry
+                            </button>
+                        </div>
+                    )}
+
+                    {activeTab === 'vars' && (
+                        <div className="grid md:grid-cols-2 gap-4">
                             <button
                                 onClick={() => handleApiCall(() => getDataVar(PAYMENT_CONTRACT_ADDRESS, PAYMENT_CONTRACT_NAME, 'total-volume'))}
-                                className="btn-neon text-xs px-4 py-2 flex-1"
+                                className="btn-primary"
                             >
-                                Get Total Volume (Var)
+                                Get Total Volume
                             </button>
                             <button
                                 onClick={() => handleApiCall(() => getConstantVal(PAYMENT_CONTRACT_ADDRESS, PAYMENT_CONTRACT_NAME, 'usdcx-contract'))}
-                                className="btn-neon text-xs px-4 py-2 flex-1 bg-neon-magenta text-white"
+                                className="btn-secondary"
                             >
-                                Get USDCx Address (Const)
+                                Get USDCx Address
                             </button>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {activeTab === 'read' && (
-                    <div className="space-y-2">
-                        <input
-                            className="w-full bg-terminal-bg border border-terminal-border p-2 text-sm text-white font-mono placeholder:text-text-muted/50 focus:border-neon-cyan outline-none rounded"
-                            placeholder="Function Name (e.g., get-payment-request)"
-                            value={fnName}
-                            onChange={e => setFnName(e.target.value)}
-                        />
-                        <input
-                            className="w-full bg-terminal-bg border border-terminal-border p-2 text-sm text-white font-mono placeholder:text-text-muted/50 focus:border-neon-cyan outline-none rounded"
-                            placeholder="Arguments (Hex encoded, comma separated) - Leave empty if none"
-                            value={fnArgs}
-                            onChange={e => setFnArgs(e.target.value)}
-                        />
-                        <button
-                            onClick={() => handleApiCall(async () => {
-                                // Arguments handling is complex in a generic generic debugger, passing empty for no-arg funcs
-                                // For specific tests, add logic here.
-                                // Defaulting to sender = contract address for read-only
-                                const args = fnArgs ? fnArgs.split(',').map(s => s.trim()) : [];
-                                const result = await callReadOnlyFunction(PAYMENT_CONTRACT_ADDRESS, PAYMENT_CONTRACT_NAME, fnName, PAYMENT_CONTRACT_ADDRESS, args);
-                                if (result.okay && result.result) {
-                                    const decoded = deserializeCV(result.result);
-                                    return { ...result, decoded: cvToJSON(decoded) };
-                                }
-                                return result;
-                            })}
-                            className="btn-neon text-xs px-4 py-2"
-                        >
-                            Call Read-Only
-                        </button>
-                    </div>
-                )}
+                    {activeTab === 'read' && (
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-text-pale uppercase tracking-widest">Function Name</label>
+                                <input
+                                    className="input-premium"
+                                    placeholder="e.g., get-payment-request"
+                                    value={fnName}
+                                    onChange={e => setFnName(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-text-pale uppercase tracking-widest">Arguments (Hex, comma separated)</label>
+                                <input
+                                    className="input-premium"
+                                    placeholder="Leave empty if none"
+                                    value={fnArgs}
+                                    onChange={e => setFnArgs(e.target.value)}
+                                />
+                            </div>
+                            <button
+                                onClick={() => handleApiCall(async () => {
+                                    const args = fnArgs ? fnArgs.split(',').map(s => s.trim()) : [];
+                                    const result = await callReadOnlyFunction(PAYMENT_CONTRACT_ADDRESS, PAYMENT_CONTRACT_NAME, fnName, PAYMENT_CONTRACT_ADDRESS, args);
+                                    if (result.okay && result.result) {
+                                        const decoded = deserializeCV(result.result);
+                                        return { ...result, decoded: cvToJSON(decoded) };
+                                    }
+                                    return result;
+                                })}
+                                className="btn-primary"
+                            >
+                                Call Read-Only
+                            </button>
+                        </div>
+                    )}
 
-                {activeTab === 'fast-read' && (
-                    <div className="space-y-2">
-                        <input
-                            className="w-full bg-terminal-bg border border-terminal-border p-2 text-sm text-white font-mono placeholder:text-text-muted/50 focus:border-neon-cyan outline-none rounded"
-                            placeholder="Function Name (e.g. get-total-volume)"
-                            value={fnName}
-                            onChange={e => setFnName(e.target.value)}
-                        />
-                        <button
-                            onClick={() => handleApiCall(async () => {
-                                const result = await fastCallReadOnlyFunction(PAYMENT_CONTRACT_ADDRESS, PAYMENT_CONTRACT_NAME, fnName, PAYMENT_CONTRACT_ADDRESS, []);
-                                if (result.okay && result.result) {
-                                    const decoded = deserializeCV(result.result);
-                                    return { ...result, decoded: cvToJSON(decoded) };
-                                }
-                                return result;
-                            })}
-                            className="btn-neon text-xs px-4 py-2 bg-neon-yellow text-terminal-bg border-neon-yellow"
-                        >
-                            Fast Call (No Cost)
-                        </button>
-                    </div>
-                )}
-            </div>
+                    {activeTab === 'fast-read' && (
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-text-pale uppercase tracking-widest">Function Name</label>
+                                <input
+                                    className="input-premium"
+                                    placeholder="e.g., get-total-volume"
+                                    value={fnName}
+                                    onChange={e => setFnName(e.target.value)}
+                                />
+                            </div>
+                            <button
+                                onClick={() => handleApiCall(async () => {
+                                    const result = await fastCallReadOnlyFunction(PAYMENT_CONTRACT_ADDRESS, PAYMENT_CONTRACT_NAME, fnName, PAYMENT_CONTRACT_ADDRESS, []);
+                                    if (result.okay && result.result) {
+                                        const decoded = deserializeCV(result.result);
+                                        return { ...result, decoded: cvToJSON(decoded) };
+                                    }
+                                    return result;
+                                })}
+                                className="h-14 px-8 bg-amber-500 text-white rounded-full font-bold transition-all duration-300 hover:bg-amber-600 shadow-premium active:scale-95"
+                            >
+                                Fast Call (No Cost)
+                            </button>
+                        </div>
+                    )}
 
-            <div className="mt-6 p-4 bg-black rounded border border-terminal-border min-h-[200px] max-h-[500px] overflow-auto">
-                {loading && <div className="text-neon-cyan animate-pulse">Loading data from blockchain...</div>}
-                {error && <div className="text-red-500 font-mono">Error: {error}</div>}
-                {output && (
-                    <pre className="text-xs font-mono text-neon-green/80 whitespace-pre-wrap">
-                        {JSON.stringify(output, null, 2)}
-                    </pre>
-                )}
-                {!loading && !error && !output && <div className="text-text-muted text-xs italic">Output will appear here...</div>}
-            </div>
+                    {/* Output */}
+                    <div className="mt-8 p-6 bg-slate-900 rounded-2xl border border-slate-700 min-h-[200px] max-h-[400px] overflow-auto">
+                        {loading && (
+                            <div className="flex items-center gap-3 text-accent-indigo">
+                                <div className="w-4 h-4 border-2 border-accent-indigo border-t-transparent rounded-full animate-spin" />
+                                <span className="text-sm font-medium">Loading data from blockchain...</span>
+                            </div>
+                        )}
+                        {error && (
+                            <div className="text-red-400 text-sm font-mono">Error: {error}</div>
+                        )}
+                        {output && (
+                            <pre className="text-xs font-mono text-emerald-400 whitespace-pre-wrap">
+                                {JSON.stringify(output, null, 2)}
+                            </pre>
+                        )}
+                        {!loading && !error && !output && (
+                            <div className="text-slate-500 text-sm italic">Output will appear here...</div>
+                        )}
+                    </div>
+                </div>
+            </motion.div>
         </div>
     );
 };

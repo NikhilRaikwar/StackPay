@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeCanvas } from 'qrcode.react';
 import { v4 as uuidv4 } from 'uuid';
 import { useWallet } from '../hooks/useWallet';
@@ -79,7 +79,6 @@ export const QRGenerator = () => {
           address
         );
       } else {
-        // Invoice logic - Recipient is who receives funds (User input OR Self)
         if (recipient.trim()) {
           resolvedRecipient = await resolveStacksRecipient(recipient);
         } else {
@@ -98,7 +97,6 @@ export const QRGenerator = () => {
       setQrData(paymentUrl);
       setPaymentId(requestId);
 
-      // Update local state
       addPayment({
         id: requestId,
         amount: parseFloat(amount),
@@ -108,16 +106,13 @@ export const QRGenerator = () => {
         createdAt: new Date().toISOString(),
       });
 
-
-
       if (db && auth && isFirebaseConfigured) {
         try {
           await signInAnonymously(auth);
-          console.log("Firebase Auth User:", auth.currentUser?.uid);
           await setDoc(doc(db, 'payments', requestId), {
             requestId,
             creator: address,
-            recipient: resolvedRecipient, // For invoice, this is the creator (me)
+            recipient: resolvedRecipient,
             amount: parseFloat(amount),
             memo: memo || (paymentType === 'escrow' ? 'Payment Request' : 'Invoice Request'),
             status: 'pending',
@@ -142,7 +137,7 @@ export const QRGenerator = () => {
     if (!canvas) return;
     const url = canvas.toDataURL('image/png');
     const link = document.createElement('a');
-    link.download = `stackspay-${paymentId.substring(0, 8)}.png`;
+    link.download = `stackpay-${paymentId.substring(0, 8)}.png`;
     link.href = url;
     link.click();
   };
@@ -153,260 +148,194 @@ export const QRGenerator = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="grid lg:grid-cols-2 gap-6">
+    <div className="max-w-5xl mx-auto">
+      <div className="grid lg:grid-cols-5 gap-8 items-start">
         {/* Form Section */}
         <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="terminal-card overflow-hidden"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="lg:col-span-3 card-premium p-0 overflow-hidden"
         >
-          {/* Header */}
-          <div className="px-6 py-4 border-b border-terminal-border bg-terminal-bg/50">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-neon-magenta/10 border border-neon-magenta/50 rounded-lg flex items-center justify-center">
-                <span className="text-neon-magenta text-xl">◎</span>
-              </div>
-              <div>
-                <h2 className="font-display font-bold text-lg text-white">SEND PAYMENT VIA QR</h2>
-                <p className="font-mono text-xs text-text-muted">Funds will be held in escrow until claimed</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-6 space-y-5">
-            {/* Payment Type Toggle */}
-            <div className="flex p-1 bg-terminal-bg border border-terminal-border rounded-lg mb-6">
+          <div className="p-8 border-b border-app-border bg-app-hover/30">
+            <h2 className="font-serif text-4xl mb-1">Request</h2>
+            <p className="text-sm text-text-pale font-medium uppercase tracking-widest">Generate Payment Link</p>
+            
+            <div className="mt-8 flex p-1 bg-white border border-app-border rounded-2xl">
               <button
                 onClick={() => setPaymentType('escrow')}
-                className={`flex-1 py-2 text-sm font-mono transition-all duration-300 rounded ${paymentType === 'escrow'
-                  ? 'bg-neon-magenta text-black font-bold shadow-[0_0_10px_rgba(255,0,255,0.3)]'
-                  : 'text-text-muted hover:text-white'
+                className={`flex-1 py-3 text-xs font-bold transition-all duration-300 rounded-xl ${paymentType === 'escrow'
+                  ? 'bg-accent-indigo text-white shadow-premium'
+                  : 'text-text-dim hover:bg-app-hover'
                   }`}
               >
-                SEND (ESCROW)
+                SECURE ESCROW
               </button>
               <button
                 onClick={() => setPaymentType('invoice')}
-                className={`flex-1 py-2 text-sm font-mono transition-all duration-300 rounded ${paymentType === 'invoice'
-                  ? 'bg-neon-cyan text-black font-bold shadow-[0_0_10px_rgba(0,255,255,0.3)]'
-                  : 'text-text-muted hover:text-white'
+                className={`flex-1 py-3 text-xs font-bold transition-all duration-300 rounded-xl ${paymentType === 'invoice'
+                  ? 'bg-accent-gold text-white shadow-premium'
+                  : 'text-text-dim hover:bg-app-hover'
                   }`}
               >
-                REQUEST (INVOICE)
+                DIRECT INVOICE
               </button>
             </div>
+          </div>
 
-            {/* Recipient */}
-            <div>
-              <label className="block font-mono text-xs text-text-muted mb-2 tracking-wider">
-                {paymentType === 'escrow'
-                  ? 'RECIPIENT (WHO WILL SCAN THIS?)'
-                  : 'RECIPIENT (WHO RECEIVES FUNDS?)'}
+          <div className="p-8 space-y-8">
+            {/* Recipient Input */}
+            <div className="space-y-3">
+              <label className="text-xs font-bold text-text-pale uppercase tracking-widest">
+                {paymentType === 'escrow' ? 'Target Recipient' : 'Funds Recipient (Optional)'}
               </label>
-              <div className={`relative flex items-center bg-terminal-bg border rounded-lg transition-all duration-300 ${recipientStatus === 'valid' ? 'border-neon-green/50' :
-                recipientStatus === 'invalid' ? 'border-status-error/50' :
-                  'border-terminal-border focus-within:border-neon-cyan'
-                }`}>
+              <div className="relative">
                 <input
                   type="text"
                   value={recipient}
-                  onChange={(event) => setRecipient(event.target.value)}
-                  placeholder={paymentType === 'escrow' ? "@alice or ST2..." : "Leave empty to receive to your wallet"}
-                  className="flex-1 bg-transparent !border-none !outline-none !ring-0 !shadow-none font-mono text-white placeholder-text-muted px-4 py-3"
-                  style={{ outline: 'none', boxShadow: 'none', border: 'none' }}
+                  onChange={(e) => setRecipient(e.target.value)}
+                  placeholder={paymentType === 'escrow' ? "@username or address" : "Leave empty for self"}
+                  className="input-premium pr-12"
                 />
-                <div className="pr-4 flex items-center">
+                <div className="absolute right-4 top-1/2 -translate-y-1/2">
                   {recipientStatus === 'checking' && (
-                    <div className="spinner w-4 h-4 border-2" />
+                    <div className="w-4 h-4 border-2 border-accent-indigo border-t-transparent rounded-full animate-spin" />
                   )}
-                  {recipientStatus === 'valid' && (
-                    <div className="group relative cursor-help">
-                      <span className="text-green-500 text-lg">✓</span>
-                      <div className="absolute bottom-full mb-2 right-0 hidden group-hover:block bg-black border border-terminal-border text-xs px-2 py-1 rounded whitespace-nowrap z-50">
-                        Valid Recipient
-                      </div>
-                    </div>
-                  )}
-                  {recipientStatus === 'invalid' && (
-                    <span className="text-red-500 text-lg">!</span>
-                  )}
+                  {recipientStatus === 'valid' && <span className="text-emerald-500 font-bold">✓</span>}
+                  {recipientStatus === 'invalid' && <span className="text-red-500 font-bold">×</span>}
                 </div>
               </div>
             </div>
 
-            {/* Amount */}
-            <div>
-              <div className="flex justify-between mb-2">
-                <label className="block font-mono text-xs text-text-muted tracking-wider">
-                  AMOUNT (USDC)
-                </label>
-                <div className="text-xs text-neon-cyan/80 font-mono">
-                  Balance: {balance !== null ? `$${balance.toFixed(2)}` : '--'} USDC
-                </div>
+            {/* Amount Input */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-bold text-text-pale uppercase tracking-widest">Requested Amount</label>
+                <span className="text-[10px] font-bold text-accent-indigo uppercase tracking-widest">
+                  Bal: {balance?.toFixed(2) || '0.00'} USDCx
+                </span>
               </div>
-              <div className="relative flex items-center bg-terminal-bg border border-terminal-border rounded-lg focus-within:border-neon-cyan transition-all duration-300">
-                <span className="pl-4 text-text-muted">$</span>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-serif text-text-pale">$</span>
                 <input
                   type="number"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0.00"
-                  className="flex-1 bg-transparent !border-none !outline-none !ring-0 !shadow-none font-mono text-white placeholder-text-muted px-2 py-3"
-                  style={{ outline: 'none', boxShadow: 'none', border: 'none' }}
+                  step="0.01"
+                  className="input-premium pl-10 pr-20 text-3xl font-serif text-accent-indigo h-16"
                 />
-                <span className="pr-4 text-xs text-text-muted font-mono">USDC</span>
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-text-pale uppercase tracking-widest">
+                  USDCx
+                </span>
               </div>
             </div>
 
-            {/* Memo */}
-            <div>
-              <label className="block font-mono text-xs text-text-muted mb-2 tracking-wider">
-                MEMO (OPTIONAL)
-              </label>
+            {/* Memo Input */}
+            <div className="space-y-3">
+              <label className="text-xs font-bold text-text-pale uppercase tracking-widest">Description / Memo</label>
               <input
                 type="text"
                 value={memo}
                 onChange={(e) => setMemo(e.target.value)}
-                placeholder="What's this for?"
-                className="w-full bg-terminal-bg border border-terminal-border rounded-lg px-4 py-3 font-mono text-sm text-white focus:border-neon-cyan outline-none transition-all duration-300"
+                placeholder="What is this for?"
+                className="input-premium"
               />
             </div>
 
-            {/* Generate Button */}
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+            <button
               onClick={generateQR}
               disabled={loading || (paymentType === 'escrow' && !recipient.trim()) || !amount}
-              className={`w-full py-4 mt-2 rounded-lg font-display font-bold text-black uppercase tracking-wider transition-all duration-300 ${loading || (paymentType === 'escrow' && !recipient.trim()) || !amount
-                ? 'bg-terminal-border cursor-not-allowed opacity-50'
-                : paymentType === 'escrow'
-                  ? 'bg-neon-magenta hover:bg-neon-magenta/90 shadow-[0_0_20px_rgba(255,0,255,0.3)]'
-                  : 'bg-neon-cyan hover:bg-neon-cyan/90 shadow-[0_0_20px_rgba(0,255,255,0.3)]'
-                }`}
+              className={`w-full h-16 rounded-full font-bold text-lg transition-all duration-300 shadow-premium active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-3 ${
+                paymentType === 'escrow' ? 'bg-accent-indigo text-white hover:bg-accent-indigo-hover' : 'bg-accent-gold text-white hover:bg-accent-gold-hover'
+              }`}
             >
               {loading ? (
-                <div className="flex items-center justify-center gap-2">
-                  <div className="spinner w-4 h-4 border-2 border-black" />
-                  <span>Processing...</span>
-                </div>
+                <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
-                paymentType === 'escrow' ? 'CREATE PAYMENT LINK' : 'CREATE INVOICE LINK'
+                <>
+                  <span>{paymentType === 'escrow' ? 'Lock Funds & Create' : 'Create Invoice Link'}</span>
+                  <span>→</span>
+                </>
               )}
-            </motion.button>
+            </button>
           </div>
         </motion.div>
 
         {/* QR Display Section */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="terminal-card flex flex-col items-center justify-center p-8 text-center min-h-[400px]"
-        >
-          {qrData ? (
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="space-y-6 w-full max-w-sm"
-            >
-              <div className="relative group">
-                {/* Scanner corners */}
-                <div className="absolute -top-4 -left-4 w-8 h-8 border-t-2 border-l-2 border-neon-cyan" />
-                <div className="absolute -top-4 -right-4 w-8 h-8 border-t-2 border-r-2 border-neon-cyan" />
-                <div className="absolute -bottom-4 -left-4 w-8 h-8 border-b-2 border-l-2 border-neon-cyan" />
-                <div className="absolute -bottom-4 -right-4 w-8 h-8 border-b-2 border-r-2 border-neon-cyan" />
-
-                <div className="bg-white p-4 rounded-lg shadow-[0_0_30px_rgba(0,255,255,0.1)]">
+        <div className="lg:col-span-2 space-y-6">
+          <AnimatePresence mode="wait">
+            {qrData ? (
+              <motion.div
+                key="qr-active"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="card-premium p-8 text-center"
+              >
+                <div className="p-4 bg-white border border-app-border rounded-3xl shadow-premium mb-8 inline-block overflow-hidden">
                   <QRCodeCanvas
                     id="qr-code"
                     value={qrData}
-                    size={250}
+                    size={220}
                     level="H"
                     includeMargin={true}
                     className="w-full h-auto"
                   />
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <h3 className="text-xl font-bold text-white font-display tracking-wide">
-                  PAYMENT LINK READY
-                </h3>
-                <p className="text-sm text-text-muted font-mono">
-                  {paymentType === 'escrow'
-                    ? 'Amount locked in escrow. Share this code with the recipient.'
-                    : 'Invoice created. Share this code to get paid.'}
-                </p>
-              </div>
-
-              {/* Payment Details */}
-              <div className="space-y-3">
-                <div className="p-3 bg-terminal-bg rounded-lg border border-terminal-border">
-                  <p className="font-mono text-xs text-text-muted">AMOUNT</p>
-                  <p className="font-display font-bold text-2xl text-neon-green">${amount} USDCx</p>
-                </div>
-
-                {memo && (
-                  <div className="p-3 bg-terminal-bg rounded-lg border border-terminal-border">
-                    <p className="font-mono text-xs text-text-muted">DESCRIPTION</p>
-                    <p className="font-body text-white">{memo}</p>
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="font-serif text-2xl mb-1">Request Generated</h3>
+                    <p className="text-xs text-text-pale font-medium uppercase tracking-widest">Scan or share link</p>
                   </div>
-                )}
 
-                <div className="p-3 bg-terminal-bg rounded-lg border border-terminal-border">
-                  <p className="font-mono text-xs text-text-muted">PAYMENT ID</p>
-                  <p className="font-mono text-xs text-text-secondary break-all">{paymentId}</p>
+                  <div className="p-4 bg-app-bg rounded-2xl border border-app-border space-y-2">
+                    <p className="text-[10px] font-bold text-text-pale uppercase tracking-widest">Direct Link</p>
+                    <p className="text-xs text-accent-indigo font-mono break-all line-clamp-2">{qrData}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={downloadQR}
+                      className="py-3 px-4 bg-white border border-app-border rounded-xl text-xs font-bold text-text-main hover:bg-app-hover transition-all"
+                    >
+                      Download PNG
+                    </button>
+                    <button
+                      onClick={copyLink}
+                      className="py-3 px-4 bg-accent-indigo/5 border border-accent-indigo/10 rounded-xl text-xs font-bold text-accent-indigo hover:bg-accent-indigo/10 transition-all"
+                    >
+                      Copy Link
+                    </button>
+                  </div>
                 </div>
-              </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="qr-empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="card-premium p-12 text-center border-dashed border-2 flex flex-col items-center justify-center min-h-[400px]"
+              >
+                <div className="w-20 h-20 bg-app-bg rounded-3xl flex items-center justify-center mb-6">
+                  <span className="text-4xl">◎</span>
+                </div>
+                <h3 className="font-serif text-2xl mb-2 text-text-pale">Awaiting Input</h3>
+                <p className="text-xs text-text-pale leading-relaxed max-w-[180px]">Fill the form to generate your secure payment request</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-              {/* Actions */}
-              <div className="grid grid-cols-2 gap-3">
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={downloadQR}
-                  className="py-3 bg-neon-cyan/10 border border-neon-cyan/50 rounded-lg
-                               font-mono text-sm text-neon-cyan
-                               hover:bg-neon-cyan hover:text-terminal-bg transition-all duration-300"
-                >
-                  ↓ DOWNLOAD
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={copyLink}
-                  className="py-3 bg-neon-green/10 border border-neon-green/50 rounded-lg
-                               font-mono text-sm text-neon-green
-                               hover:bg-neon-green hover:text-terminal-bg transition-all duration-300"
-                >
-                  ⎘ COPY LINK
-                </motion.button>
-              </div>
-
-              {/* Link Display */}
-              <div className="p-3 bg-terminal-bg rounded-lg border border-terminal-border">
-                <p className="font-mono text-xs text-text-muted mb-2">SHARE LINK</p>
-                <a
-                  href={qrData}
-                  className="font-mono text-xs text-neon-cyan hover:underline break-all"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {qrData}
-                </a>
-              </div>
-            </motion.div>
-          ) : (
-            <div className="h-full flex flex-col items-center justify-center py-16 text-center">
-              <div className="w-32 h-32 bg-terminal-bg border-2 border-dashed border-terminal-border rounded-xl flex items-center justify-center mb-4">
-                <span className="text-4xl text-text-muted">◎</span>
-              </div>
-              <p className="font-mono text-sm text-text-muted">Fill out the form and generate</p>
-              <p className="font-mono text-xs text-text-muted">a payment request QR code</p>
-            </div>
-          )}
-        </motion.div>
+          <div className="p-6 bg-emerald-50 border border-emerald-100 rounded-2xl">
+            <h4 className="text-[10px] font-bold text-emerald-800 uppercase tracking-widest mb-2 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+              Security Note
+            </h4>
+            <p className="text-xs text-emerald-700 leading-relaxed">
+              Escrow requests securely lock your funds until the recipient scans and claims them. You can revoke them at any time from your history.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

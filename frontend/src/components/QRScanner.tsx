@@ -22,7 +22,6 @@ export const QRScanner = () => {
 
     scanner.render(
       (decodedText) => {
-        // Play success sound
         const playScanSound = () => {
           try {
             const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
@@ -67,59 +66,51 @@ export const QRScanner = () => {
   }, [navigate]);
 
   return (
-    <div className="max-w-lg mx-auto">
+    <div className="max-w-xl mx-auto">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="terminal-card overflow-hidden"
+        className="card-premium p-0 overflow-hidden"
       >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-terminal-border bg-terminal-bg/50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-neon-yellow/10 border border-neon-yellow/50 rounded-lg flex items-center justify-center">
-              <span className="text-neon-yellow text-xl">◎</span>
-            </div>
-            <div>
-              <h2 className="font-display font-bold text-lg text-white">SCAN QR CODE</h2>
-              <p className="font-mono text-xs text-text-muted">Point camera at payment QR</p>
-            </div>
-          </div>
+        <div className="p-8 border-b border-app-border bg-app-hover/30">
+          <h2 className="font-serif text-4xl mb-1">Scan</h2>
+          <p className="text-sm text-text-pale font-medium uppercase tracking-widest">QR Code Scanner</p>
         </div>
 
-        <div className="p-6">
+        <div className="p-8">
           {/* Scanner Status */}
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <span className={`w-2 h-2 rounded-full ${isScanning ? 'bg-neon-green animate-pulse' : 'bg-neon-cyan'}`} />
-            <span className="font-mono text-xs text-text-muted tracking-wider">
-              {isScanning ? 'SCANNING...' : 'DETECTED'}
+          <div className="flex items-center justify-center gap-3 mb-8">
+            <span className={`w-3 h-3 rounded-full ${isScanning ? 'bg-accent-indigo animate-pulse' : 'bg-emerald-500'}`} />
+            <span className="text-xs font-bold text-text-pale uppercase tracking-widest">
+              {isScanning ? 'Awaiting QR Code...' : 'Code Detected'}
             </span>
           </div>
 
           {/* Scanner Container */}
-          <div className="relative">
-            {/* Scanner Frame */}
-            <div className="absolute inset-0 pointer-events-none z-10">
-              <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-neon-cyan" />
-              <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-neon-cyan" />
-              <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-neon-cyan" />
-              <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-neon-cyan" />
+          <div className="relative rounded-3xl overflow-hidden border-2 border-dashed border-app-border bg-app-bg">
+            {/* Scanner Frame Corners */}
+            <div className="absolute inset-0 pointer-events-none z-10 p-4">
+              <div className="relative w-full h-full">
+                <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-accent-indigo rounded-tl-2xl" />
+                <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-accent-indigo rounded-tr-2xl" />
+                <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-accent-indigo rounded-bl-2xl" />
+                <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-accent-indigo rounded-br-2xl" />
+              </div>
             </div>
 
             {/* QR Scanner */}
             <div
               id="qr-scanner"
-              className="rounded-lg overflow-hidden bg-terminal-bg [&_video]:rounded-lg"
-              style={{
-                // Override html5-qrcode default styles
-              }}
+              className="rounded-3xl overflow-hidden"
             />
 
             {/* Scan Line Animation */}
             {isScanning && (
               <motion.div
                 animate={{ y: ['0%', '100%', '0%'] }}
-                transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                className="absolute left-4 right-4 h-0.5 bg-gradient-to-r from-transparent via-neon-cyan to-transparent pointer-events-none z-20"
+                transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }}
+                className="absolute left-8 right-8 h-1 bg-gradient-to-r from-transparent via-accent-indigo to-transparent pointer-events-none z-20 rounded-full shadow-glow-indigo"
               />
             )}
           </div>
@@ -129,28 +120,28 @@ export const QRScanner = () => {
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mt-4 p-4 bg-terminal-bg rounded-lg border border-neon-green/30"
+              className="mt-8 p-4 bg-emerald-50 rounded-2xl border border-emerald-100"
             >
-              <div className="flex items-center gap-2 mb-2">
-                <span className="w-2 h-2 bg-neon-green rounded-full" />
-                <span className="font-mono text-xs text-neon-green tracking-wider">QR DETECTED</span>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center text-white text-xs">✓</div>
+                <span className="text-xs font-bold text-emerald-700 uppercase tracking-widest">QR Code Detected</span>
               </div>
-              <p className="font-mono text-xs text-text-secondary break-all">{scanResult}</p>
+              <p className="text-xs text-emerald-600 font-mono break-all">{scanResult}</p>
             </motion.div>
           )}
 
           {/* Instructions */}
-          <div className="mt-6 p-4 bg-terminal-bg/50 rounded-lg border border-terminal-border">
-            <p className="font-mono text-xs text-text-muted mb-3">INSTRUCTIONS</p>
-            <ul className="space-y-2">
+          <div className="mt-8 p-6 bg-app-bg/50 rounded-2xl border border-app-border">
+            <p className="text-[10px] font-bold text-text-pale uppercase tracking-widest mb-4">How to Scan</p>
+            <ul className="space-y-3">
               {[
                 'Position the QR code within the frame',
-                'Make sure the code is well-lit and in focus',
-                'The scanner will automatically detect payment QRs',
-                'You will be redirected to claim the payment',
+                'Ensure adequate lighting for best results',
+                'Auto-detection will redirect you to claim',
+                'Works with all StackPay payment QR codes',
               ].map((instruction, i) => (
-                <li key={i} className="flex items-start gap-2 font-mono text-xs text-text-secondary">
-                  <span className="text-neon-cyan">{i + 1}.</span>
+                <li key={i} className="flex items-start gap-3 text-sm text-text-dim">
+                  <span className="flex-shrink-0 w-6 h-6 bg-accent-indigo/10 rounded-lg flex items-center justify-center text-[10px] font-bold text-accent-indigo">{i + 1}</span>
                   {instruction}
                 </li>
               ))}
@@ -168,51 +159,54 @@ export const QRScanner = () => {
           display: none !important;
         }
         #qr-scanner video {
-          border-radius: 8px !important;
+          border-radius: 24px !important;
         }
         #qr-scanner__scan_region {
           background: transparent !important;
         }
         #qr-scanner__dashboard_section {
-          padding: 0 !important;
+          padding: 16px !important;
         }
         #qr-scanner__dashboard_section_csr button {
-          background: #00f5ff !important;
-          color: #0a0a0f !important;
+          background: #4F46E5 !important;
+          color: white !important;
           border: none !important;
-          padding: 12px 24px !important;
-          font-family: 'JetBrains Mono', monospace !important;
-          font-size: 12px !important;
-          text-transform: uppercase !important;
-          letter-spacing: 0.1em !important;
-          border-radius: 8px !important;
+          padding: 14px 28px !important;
+          font-family: 'Outfit', sans-serif !important;
+          font-size: 13px !important;
+          font-weight: 600 !important;
+          text-transform: none !important;
+          letter-spacing: 0 !important;
+          border-radius: 9999px !important;
           cursor: pointer !important;
           transition: all 0.3s ease !important;
         }
         #qr-scanner__dashboard_section_csr button:hover {
-          transform: scale(1.02) !important;
-          box-shadow: 0 0 20px rgba(0, 245, 255, 0.3) !important;
+          background: #4338CA !important;
+          transform: translateY(-2px) !important;
+          box-shadow: 0 10px 20px rgba(79, 70, 229, 0.2) !important;
         }
         #qr-scanner__dashboard_section_csr select {
-          background: #1a1a24 !important;
-          color: white !important;
-          border: 1px solid #2a2a3a !important;
-          padding: 8px 12px !important;
-          font-family: 'JetBrains Mono', monospace !important;
-          font-size: 12px !important;
-          border-radius: 8px !important;
-          margin: 8px 0 !important;
+          background: white !important;
+          color: #111827 !important;
+          border: 1px solid #E5E7EB !important;
+          padding: 12px 16px !important;
+          font-family: 'Outfit', sans-serif !important;
+          font-size: 13px !important;
+          border-radius: 12px !important;
+          margin: 12px 0 !important;
         }
         #qr-scanner__dashboard_section_csr span {
-          color: #a0a0b0 !important;
-          font-family: 'JetBrains Mono', monospace !important;
-          font-size: 11px !important;
+          color: #9CA3AF !important;
+          font-family: 'Outfit', sans-serif !important;
+          font-size: 12px !important;
         }
         #html5-qrcode-anchor-scan-type-change {
-          color: #00f5ff !important;
+          color: #4F46E5 !important;
           text-decoration: none !important;
-          font-family: 'JetBrains Mono', monospace !important;
-          font-size: 11px !important;
+          font-family: 'Outfit', sans-serif !important;
+          font-size: 12px !important;
+          font-weight: 600 !important;
         }
       `}</style>
     </div>

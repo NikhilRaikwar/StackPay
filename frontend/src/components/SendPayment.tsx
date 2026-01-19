@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useWallet } from '../hooks/useWallet';
 import { getUSDCxBalance, resolveStacksRecipient, sendUSDCx } from '../utils/stacksUtils';
 import { usePayment } from '../hooks/usePayment';
@@ -32,7 +32,6 @@ export const SendPayment = () => {
       try {
         const resolved = await resolveStacksRecipient(recipient);
         if (resolved === address) {
-          // Self-sending is technically valid address wise, but invalid for transfer
           setRecipientStatus('invalid');
         } else {
           setRecipientStatus('valid');
@@ -97,16 +96,18 @@ export const SendPayment = () => {
 
   if (!isConnected) {
     return (
-      <div className="max-w-lg mx-auto">
-        <div className="terminal-card p-8 text-center">
-          <div className="text-6xl mb-4">🔒</div>
-          <h2 className="font-display font-bold text-xl text-white mb-2">WALLET REQUIRED</h2>
-          <p className="font-mono text-sm text-text-muted mb-6">Connect your wallet to send payments</p>
+      <div className="max-w-xl mx-auto text-center py-20">
+        <div className="card-premium p-12">
+          <div className="w-20 h-20 bg-accent-indigo/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
+            <span className="text-4xl">🔒</span>
+          </div>
+          <h2 className="font-serif text-3xl mb-4">Connection Required</h2>
+          <p className="text-text-dim mb-8 max-w-xs mx-auto">Please connect your wallet to access the transfer terminal.</p>
           <button
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="btn-neon py-3 px-8"
+            className="btn-primary"
           >
-            CONNECT WALLET ↑
+            Connect Wallet
           </button>
         </div>
       </div>
@@ -114,168 +115,157 @@ export const SendPayment = () => {
   }
 
   return (
-    <div className="max-w-lg mx-auto">
+    <div className="max-w-2xl mx-auto">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="terminal-card overflow-hidden"
+        className="card-premium p-0 overflow-hidden"
       >
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-terminal-border bg-terminal-bg/50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-neon-cyan/10 border border-neon-cyan/50 rounded-lg flex items-center justify-center">
-              <span className="text-neon-cyan text-xl">↗</span>
-            </div>
+        {/* Header Section */}
+        <div className="p-8 border-b border-app-border bg-app-hover/30">
+          <div className="flex items-center justify-between mb-8">
             <div>
-              <h2 className="font-display font-bold text-lg text-white">SEND PAYMENT</h2>
-              <p className="font-mono text-xs text-text-muted">Transfer USDCx instantly</p>
+              <h2 className="font-serif text-4xl mb-1">Transfer</h2>
+              <p className="text-sm text-text-pale font-medium uppercase tracking-widest">USDCx Assets</p>
             </div>
-          </div>
-        </div>
-
-        <div className="p-6 space-y-6">
-          {/* Balance Display */}
-          <div className="p-4 bg-terminal-bg rounded-lg border border-terminal-border">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-mono text-xs text-text-muted mb-1">AVAILABLE BALANCE</p>
-                <p className="font-display font-bold text-3xl text-white amount-display">
-                  ${balance.toFixed(2)}
-                </p>
+            <div className="text-right">
+              <p className="text-[10px] text-text-pale font-bold uppercase tracking-widest mb-1">Available</p>
+              <div className="flex items-baseline gap-1">
+                <span className="text-3xl font-serif text-accent-indigo">${balance.toFixed(2)}</span>
+                <span className="text-xs font-bold text-text-pale uppercase">USDCx</span>
               </div>
-              <div className="text-right">
-                <span className="status-badge-completed">USDCx</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Recipient Input */}
-          <div>
-            <label className="block font-mono text-xs text-text-muted mb-2 tracking-wider">
-              RECIPIENT ADDRESS OR USERNAME
-            </label>
-            <div className={`relative flex items-center bg-terminal-bg border rounded-lg transition-all duration-300 ${recipientStatus === 'valid' ? 'border-neon-green/50' :
-              recipientStatus === 'invalid' ? 'border-status-error/50' :
-                'border-terminal-border focus-within:border-neon-cyan'
-              }`}>
-              <input
-                type="text"
-                value={recipient}
-                onChange={(event) => setRecipient(event.target.value)}
-                placeholder="ST2... or username"
-                className="flex-1 bg-transparent !border-none !outline-none !ring-0 !shadow-none font-mono text-white placeholder-text-muted px-4 py-3"
-                style={{ outline: 'none', boxShadow: 'none', border: 'none' }}
-              />
-
-              <div className="pr-4 flex items-center">
-                {recipientStatus === 'checking' && (
-                  <div className="spinner w-4 h-4 border-2" />
-                )}
-                {recipientStatus === 'valid' && (
-                  <div className="group relative cursor-help">
-                    <span className="text-neon-green text-lg">✓</span>
-                    <div className="absolute bottom-full right-0 mb-2 w-max hidden group-hover:block px-2 py-1 bg-terminal-bg border border-neon-green rounded text-xs text-neon-green">
-                      Verified User
-                    </div>
-                  </div>
-                )}
-                {recipientStatus === 'invalid' && (
-                  <div className="group relative cursor-help">
-                    <span className="text-status-error text-lg">✗</span>
-                    <div className="absolute bottom-full right-0 mb-2 w-max hidden group-hover:block px-2 py-1 bg-terminal-bg border border-status-error rounded text-xs text-status-error">
-                      User not found
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Amount Input */}
-          <div>
-            <label className="block font-mono text-xs text-text-muted mb-2 tracking-wider">
-              AMOUNT (USDCx)
-            </label>
-            <div className="relative flex items-center px-4 py-3 bg-terminal-bg border border-terminal-border rounded-lg focus-within:border-neon-cyan focus-within:ring-2 focus-within:ring-neon-cyan/20 transition-all duration-300">
-              <span className="text-neon-green text-xl font-display mr-1">$</span>
-              <input
-                type="number"
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-                placeholder="0.00"
-                step="0.01"
-                className="flex-1 bg-transparent !border-none !outline-none !ring-0 !shadow-none text-xl font-display text-white placeholder-text-muted p-0 pr-16"
-                style={{ outline: 'none', boxShadow: 'none', border: 'none' }}
-              />
-              <button
-                onClick={() => setAmount(balance.toString())}
-                className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-1 bg-neon-cyan/10 border border-neon-cyan/30 rounded
-                           font-mono text-xs text-neon-cyan hover:bg-neon-cyan hover:text-terminal-bg transition-all"
-              >
-                MAX
-              </button>
             </div>
           </div>
 
           {/* Quick Amounts */}
           <div className="flex flex-wrap gap-2">
-            {[5, 10, 25, 50, 100].map((val) => (
+            {[10, 25, 50, 100].map((val) => (
               <button
                 key={val}
                 onClick={() => setAmount(val.toString())}
-                className="px-4 py-2 bg-terminal-bg border border-terminal-border rounded-lg
-                           font-mono text-sm text-text-secondary
-                           hover:border-neon-cyan hover:text-neon-cyan transition-all duration-300"
+                className="px-4 py-2 bg-white border border-app-border rounded-xl text-sm font-semibold text-text-dim hover:border-accent-indigo hover:text-accent-indigo transition-all duration-200"
               >
-                ${val}
+                + ${val}
               </button>
             ))}
+            <button
+              onClick={() => setAmount(balance.toString())}
+              className="px-4 py-2 bg-accent-indigo/5 border border-accent-indigo/10 rounded-xl text-sm font-bold text-accent-indigo hover:bg-accent-indigo/10 transition-all duration-200"
+            >
+              Max
+            </button>
+          </div>
+        </div>
+
+        {/* Form Section */}
+        <div className="p-8 space-y-8">
+          {/* Recipient Input */}
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <label className="text-xs font-bold text-text-pale uppercase tracking-widest">Recipient</label>
+              <AnimatePresence>
+                {recipientStatus === 'valid' && (
+                  <motion.span 
+                    initial={{ opacity: 0, x: 5 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="text-[10px] font-bold text-emerald-500 uppercase flex items-center gap-1"
+                  >
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                    Valid Address
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                value={recipient}
+                onChange={(e) => setRecipient(e.target.value)}
+                placeholder="Stacks Address or @username"
+                className={`input-premium pr-12 ${recipientStatus === 'invalid' ? 'border-red-300 focus:border-red-400' : ''}`}
+              />
+              <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                {recipientStatus === 'checking' && (
+                  <div className="w-4 h-4 border-2 border-accent-indigo border-t-transparent rounded-full animate-spin" />
+                )}
+                {recipientStatus === 'valid' && <span className="text-emerald-500 font-bold">✓</span>}
+                {recipientStatus === 'invalid' && <span className="text-red-500 font-bold">×</span>}
+              </div>
+            </div>
           </div>
 
-          {/* Send Button */}
-          <motion.button
-            whileHover={{ scale: loading ? 1 : 1.02 }}
-            whileTap={{ scale: loading ? 1 : 0.98 }}
+          {/* Amount Input */}
+          <div className="space-y-3">
+            <label className="text-xs font-bold text-text-pale uppercase tracking-widest">Amount</label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-serif text-text-pale">$</span>
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+                step="0.01"
+                className="input-premium pl-10 pr-20 text-3xl font-serif text-accent-indigo h-16"
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-text-pale uppercase tracking-widest">
+                USDCx
+              </span>
+            </div>
+          </div>
+
+          {/* Action Button */}
+          <button
             onClick={handleSend}
-            disabled={loading || !recipient || !amount}
-            className="w-full btn-neon-solid py-4 text-base flex items-center justify-center gap-3"
+            disabled={loading || !recipient || !amount || recipientStatus === 'invalid'}
+            className="w-full btn-primary h-16 text-lg flex items-center justify-center gap-3 relative overflow-hidden group"
           >
             {loading ? (
-              <>
-                <span className="spinner" />
-                PROCESSING...
-              </>
+              <div className="flex items-center gap-3">
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Processing Transaction...</span>
+              </div>
             ) : (
               <>
-                SEND PAYMENT
-                <span>→</span>
+                <span>Confirm Transfer</span>
+                <span className="transition-transform group-hover:translate-x-1">→</span>
               </>
             )}
-          </motion.button>
+          </button>
 
-          {/* Success Message */}
-          {txId && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="p-4 bg-neon-green/10 border border-neon-green/30 rounded-lg"
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <span className="w-2 h-2 bg-neon-green rounded-full animate-pulse" />
-                <span className="font-mono text-xs text-neon-green tracking-wider">TRANSACTION CONFIRMED</span>
-              </div>
-              <a
-                href={`https://explorer.hiro.so/txid/${txId}?chain=testnet`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-mono text-xs text-text-secondary hover:text-neon-cyan break-all transition-colors"
+          {/* Success State */}
+          <AnimatePresence>
+            {txId && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="mt-6 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl"
               >
-                {txId} ↗
-              </a>
-            </motion.div>
-          )}
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center text-white text-[10px]">✓</div>
+                  <span className="text-sm font-bold text-emerald-800">Transfer Successful</span>
+                </div>
+                <p className="text-[11px] text-emerald-600 mb-2 truncate font-mono">TX: {txId}</p>
+                <a
+                  href={`https://explorer.hiro.so/txid/${txId}?chain=testnet`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] font-bold text-emerald-700 underline uppercase tracking-widest"
+                >
+                  View on Explorer ↗
+                </a>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </motion.div>
+
+      {/* Security Tip */}
+      <div className="mt-8 flex items-center gap-4 px-6 py-4 bg-amber-50/50 border border-amber-100 rounded-2xl">
+        <span className="text-xl">🛡️</span>
+        <p className="text-xs text-amber-800 leading-relaxed">
+          Ensure the recipient address is correct. Transactions on the Stacks blockchain are immutable and cannot be reversed once confirmed.
+        </p>
+      </div>
     </div>
   );
 };
