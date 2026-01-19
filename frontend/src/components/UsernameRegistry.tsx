@@ -154,8 +154,29 @@ export const UsernameRegistry = () => {
         stringAsciiCV(username.trim()),
       ]);
 
-      // If result has a value, the username is already registered (taken)
-      if (result.value) {
+      let isTaken = false;
+      let data = result;
+
+      // 1. Unwrap 'response' or 'success' wrapper if present
+      if (data && (data.type === 'success' || data.type === 'response') && data.value) {
+        data = data.value;
+      }
+
+      // 2. Check if it's an 'optional' type
+      if (data && data.type === 'optional') {
+        // (ok none) or (none) -> value is null -> Available
+        // (ok (some ...)) -> value is not null -> Taken
+        if (data.value !== null) {
+          isTaken = true;
+        }
+      } else {
+        // Fallback: If structure is unexpected, check if we found a principal string
+        if (JSON.stringify(data).includes('"type":"principal"')) {
+          isTaken = true;
+        }
+      }
+
+      if (isTaken) {
         setAvailability('taken');
         alert('Username already taken.');
         return;
