@@ -103,59 +103,40 @@ export const WalletConnect = () => {
 
   return (
     <div className="relative flex items-center gap-3">
-      {/* Ethereum Wallet */}
-      {!ethAddress ? (
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={connectEthereumWallet}
-          className="hidden sm:flex items-center gap-2 px-4 py-2 bg-terminal-card border border-neon-magenta/50 rounded-lg 
-                     text-neon-magenta font-mono text-xs tracking-wider
-                     hover:bg-neon-magenta/10 hover:border-neon-magenta transition-all duration-300"
-        >
-          <span className="text-lg">◈</span>
-          <span className="hidden md:inline">ETH</span>
-        </motion.button>
-      ) : (
-        <div className="hidden sm:flex items-center gap-2 px-3 py-2 bg-neon-magenta/10 border border-neon-magenta/30 rounded-lg">
-          <span className="w-2 h-2 bg-neon-magenta rounded-full animate-pulse" />
-          <span className="font-mono text-xs text-neon-magenta">
-            {ethAddress.substring(0, 4)}...{ethAddress.substring(ethAddress.length - 3)}
+      {/* Ethereum Wallet Badge */}
+      {ethAddress && (
+        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-100 rounded-full">
+          <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+          <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">
+            ETH: {ethAddress.substring(0, 4)}...{ethAddress.substring(ethAddress.length - 3)}
           </span>
         </div>
       )}
 
-      {/* Stacks Wallet */}
+      {/* Stacks Wallet Toggle */}
       {!isConnected ? (
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
+        <button
           onClick={connectWallet}
-          className="btn-neon py-2 px-4 text-xs"
+          className="btn-primary"
         >
-          <span className="hidden sm:inline">CONNECT WALLET</span>
-          <span className="sm:hidden">CONNECT</span>
-        </motion.button>
+          Connect Wallet
+        </button>
       ) : (
         <motion.button
-          whileHover={{ scale: 1.02 }}
+          whileHover={{ y: -2 }}
           whileTap={{ scale: 0.98 }}
           onClick={() => setMenuOpen((open) => !open)}
-          className="flex items-center gap-2 px-4 py-2 bg-terminal-card border border-neon-cyan/50 rounded-lg
-                     hover:bg-neon-cyan/10 hover:border-neon-cyan transition-all duration-300"
+          className="flex items-center gap-3 pl-4 pr-3 py-2 bg-white border border-app-border rounded-full shadow-premium hover:shadow-floating transition-all duration-300"
         >
-          <span className="w-2 h-2 bg-neon-green rounded-full animate-pulse" />
-          <span className="font-mono text-sm text-white">
+          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+          <span className="font-semibold text-sm text-text-main">
             {username ? `@${username}` : `${address?.substring(0, 6)}...`}
           </span>
-          <svg
-            className={`w-4 h-4 text-neon-cyan transition-transform ${menuOpen ? 'rotate-180' : ''}`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
+          <div className={`p-1 bg-app-hover rounded-full transition-transform duration-300 ${menuOpen ? 'rotate-180' : ''}`}>
+            <svg className="w-4 h-4 text-text-pale" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
         </motion.button>
       )}
 
@@ -163,102 +144,84 @@ export const WalletConnect = () => {
       <AnimatePresence>
         {isConnected && menuOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
-            className="absolute right-0 top-14 w-80 bg-terminal-card border border-terminal-border rounded-lg shadow-glow overflow-hidden z-50"
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="absolute right-0 top-14 w-80 glass border border-app-border rounded-2xl shadow-floating overflow-hidden z-50 p-2"
           >
             {/* Header */}
-            <div className="px-4 py-3 border-b border-terminal-border bg-terminal-bg/50">
-              <div className="font-mono text-xs text-text-muted tracking-wider">WALLET STATUS</div>
+            <div className="px-4 py-3 mb-2">
+              <p className="text-[10px] font-bold text-text-pale uppercase tracking-widest">Connected Accounts</p>
             </div>
 
-            {/* Wallet Info */}
-            <div className="p-4 space-y-3">
-              {/* Stacks Address */}
-              <div className="p-3 bg-terminal-bg rounded-lg border border-terminal-border">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="w-2 h-2 bg-neon-cyan rounded-full" />
-                  <span className="font-mono text-xs text-neon-cyan">STACKS</span>
+            {/* Wallet Info Cards */}
+            <div className="space-y-2 mb-4">
+              {/* Stacks Card */}
+              <div className="p-4 bg-app-bg/50 rounded-xl border border-app-border">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold text-accent-indigo uppercase tracking-widest">Stacks</span>
+                  <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
                 </div>
-                <p className="font-mono text-xs text-text-secondary break-all">{address}</p>
-              </div>
-
-              {/* Ethereum Address */}
-              <div className="p-3 bg-terminal-bg rounded-lg border border-terminal-border">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className={`w-2 h-2 rounded-full ${ethAddress ? 'bg-neon-magenta' : 'bg-text-muted'}`} />
-                  <span className="font-mono text-xs text-neon-magenta">ETHEREUM</span>
-                </div>
-                {ethAddress ? (
-                  <p className="font-mono text-xs text-text-secondary break-all">{ethAddress}</p>
-                ) : (
-                  <button
-                    onClick={connectEthereumWallet}
-                    className="text-xs text-neon-magenta hover:underline font-mono"
-                  >
-                    + Connect Ethereum
-                  </button>
-                )}
-              </div>
-
-              {/* Identity */}
-              <div className="p-3 bg-terminal-bg rounded-lg border border-terminal-border">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className={`w-2 h-2 rounded-full ${username ? 'bg-neon-green' : 'bg-status-warning'}`} />
-                  <span className="font-mono text-xs text-neon-green">IDENTITY</span>
-                </div>
+                <p className="text-[11px] font-mono text-text-dim break-all mb-2">{address}</p>
                 {username ? (
-                  <p className="font-display font-bold text-white">@{username}</p>
+                  <div className="inline-flex px-2 py-0.5 bg-accent-indigo/10 text-accent-indigo text-[10px] font-bold rounded-md">
+                    @{username}
+                  </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-2 mt-3">
                     <input
                       type="text"
                       value={usernameInput}
-                      onChange={(event) => setUsernameInput(event.target.value)}
-                      placeholder="claim your @username"
-                      className="w-full px-3 py-2 bg-terminal-card border border-terminal-border rounded font-mono text-xs text-white placeholder-text-muted
-                                 focus:outline-none focus:border-neon-green"
+                      onChange={(e) => setUsernameInput(e.target.value)}
+                      placeholder="Claim @username"
+                      className="w-full px-3 py-2 bg-white border border-app-border rounded-lg text-xs focus:ring-1 focus:ring-accent-indigo outline-none"
                     />
                     <button
                       onClick={handleClaimIdentity}
                       disabled={!usernameInput.trim() || claiming}
-                      className="w-full py-2 bg-neon-green/10 border border-neon-green/50 rounded font-mono text-xs text-neon-green
-                                 hover:bg-neon-green hover:text-terminal-bg transition-all duration-300
-                                 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full py-2 bg-accent-indigo text-white rounded-lg text-xs font-bold disabled:opacity-50"
                     >
-                      {claiming ? (
-                        <span className="flex items-center justify-center gap-2">
-                          <span className="spinner" />
-                          CLAIMING...
-                        </span>
-                      ) : (
-                        'CLAIM IDENTITY'
-                      )}
+                      {claiming ? 'Registering...' : 'Register Identity'}
                     </button>
                   </div>
+                )}
+              </div>
+
+              {/* Ethereum Card */}
+              <div className="p-4 bg-app-bg/50 rounded-xl border border-app-border">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">Ethereum</span>
+                  <div className={`w-1.5 h-1.5 rounded-full ${ethAddress ? 'bg-emerald-500' : 'bg-text-pale'}`} />
+                </div>
+                {ethAddress ? (
+                  <p className="text-[11px] font-mono text-text-dim break-all">{ethAddress}</p>
+                ) : (
+                  <button
+                    onClick={connectEthereumWallet}
+                    className="text-xs text-blue-600 hover:underline font-bold"
+                  >
+                    + Connect Ethereum Wallet
+                  </button>
                 )}
               </div>
             </div>
 
             {/* Actions */}
-            <div className="px-4 pb-4 space-y-2">
+            <div className="space-y-1">
               {ethAddress && (
                 <button
                   onClick={disconnectEthereumWallet}
-                  className="w-full py-2 bg-terminal-bg border border-terminal-border rounded font-mono text-xs text-text-secondary
-                             hover:border-neon-magenta hover:text-neon-magenta transition-all duration-300"
+                  className="w-full py-2.5 text-xs font-semibold text-text-dim hover:bg-app-hover rounded-xl transition-colors"
                 >
-                  DISCONNECT ETH
+                  Disconnect Ethereum
                 </button>
               )}
               <button
                 onClick={disconnectWallet}
-                className="w-full py-2 bg-status-error/10 border border-status-error/50 rounded font-mono text-xs text-status-error
-                           hover:bg-status-error hover:text-white transition-all duration-300"
+                className="w-full py-2.5 text-xs font-bold text-red-500 hover:bg-red-50 rounded-xl transition-colors"
               >
-                DISCONNECT ALL
+                Sign Out
               </button>
             </div>
           </motion.div>

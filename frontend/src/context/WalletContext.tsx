@@ -86,7 +86,7 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
     setUserData(null);
     setIsConnected(false);
     setAddress(null);
-    window.location.reload();
+    window.location.href = '/';
   }, [userSession]);
 
   const connectEthereumWallet = useCallback(async () => {
