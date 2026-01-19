@@ -4,6 +4,11 @@
 
 StacksPay Pro revolutionizes peer-to-peer payments on the Stacks blockchain. By leveraging smart contracts for escrow and utilizing the speed of USDCx, we ensure that every transaction is secure, transparent, and user-friendly.
 
+
+<div align="center">
+  <video src="frontend/public/stackpay%20demo.mp4" width="100%" controls></video>
+</div>
+
 ---
 
 ## ✨ Features
