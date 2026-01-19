@@ -1,5 +1,6 @@
 import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Analytics } from '@vercel/analytics/react';
 import { WalletProvider } from './context/WalletContext';
 import { PaymentProvider } from './context/PaymentContext';
 import { WalletConnect } from './components/WalletConnect';
@@ -169,6 +170,7 @@ function App() {
     <WalletProvider>
       <PaymentProvider>
         <BrowserRouter>
+          <Analytics />
           <AuthManager />
           <div className="min-h-screen bg-app-bg grid-subtle selection:bg-accent-indigo/10 selection:text-accent-indigo">
             <Navigation />
