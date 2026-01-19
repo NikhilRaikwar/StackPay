@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { openContractCall } from '@stacks/connect';
 import {
   cvToJSON,
@@ -52,7 +52,6 @@ export const UsernameRegistry = () => {
   const [myUsername, setMyUsername] = useState<string>('');
   const [availability, setAvailability] = useState<'available' | 'taken' | ''>('');
   const [loading, setLoading] = useState(false);
-
   const [lookingUp, setLookingUp] = useState(false);
 
   useEffect(() => {
@@ -73,7 +72,6 @@ export const UsernameRegistry = () => {
     void loadMyUsername();
   }, [address]);
 
-  // Auto-check availability with debounce
   useEffect(() => {
     const timer = setTimeout(() => {
       if (username.trim() && !myUsername) {
@@ -84,7 +82,6 @@ export const UsernameRegistry = () => {
     return () => clearTimeout(timer);
   }, [username]);
 
-  // Auto-lookup with debounce
   useEffect(() => {
     const timer = setTimeout(() => {
       if (lookup.trim()) {
@@ -151,7 +148,6 @@ export const UsernameRegistry = () => {
         stringAsciiCV(lookup.trim()),
       ]);
 
-      // Check if value exists and is a valid Stacks address (starts with S)
       if (result.value && typeof result.value.value === 'string' && result.value.value.startsWith('S')) {
         setLookupResult(result.value.value);
       } else {
@@ -175,23 +171,23 @@ export const UsernameRegistry = () => {
       setAvailability(result.value ? 'taken' : 'available');
     } catch {
       setAvailability('available');
-    } finally {
-      // Done
     }
   };
 
   if (!isConnected) {
     return (
-      <div className="max-w-lg mx-auto">
-        <div className="terminal-card p-8 text-center">
-          <div className="text-6xl mb-4">🔒</div>
-          <h2 className="font-display font-bold text-xl text-white mb-2">WALLET REQUIRED</h2>
-          <p className="font-mono text-sm text-text-muted mb-6">Connect your wallet to claim your identity</p>
+      <div className="max-w-xl mx-auto text-center py-20">
+        <div className="card-premium p-12">
+          <div className="w-20 h-20 bg-purple-50 rounded-3xl flex items-center justify-center mx-auto mb-6">
+            <span className="text-4xl">@</span>
+          </div>
+          <h2 className="font-serif text-3xl mb-4">Connection Required</h2>
+          <p className="text-text-dim mb-8 max-w-xs mx-auto">Please connect your wallet to claim your on-chain identity.</p>
           <button
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="btn-neon py-3 px-8"
+            className="btn-primary"
           >
-            CONNECT WALLET ↑
+            Connect Wallet
           </button>
         </div>
       </div>
@@ -199,121 +195,116 @@ export const UsernameRegistry = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="grid lg:grid-cols-2 gap-6">
+    <div className="max-w-5xl mx-auto">
+      <div className="grid lg:grid-cols-2 gap-8">
         {/* Register Section */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
-          className="terminal-card overflow-hidden"
+          className="card-premium p-0 overflow-hidden"
         >
-          {/* Header */}
-          <div className="px-6 py-4 border-b border-terminal-border bg-terminal-bg/50">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-neon-pink/10 border border-neon-pink/50 rounded-lg flex items-center justify-center">
-                <span className="text-neon-pink text-xl">@</span>
-              </div>
-              <div>
-                <h2 className="font-display font-bold text-lg text-white">CLAIM IDENTITY</h2>
-                <p className="font-mono text-xs text-text-muted">Register your @username</p>
-              </div>
-            </div>
+          <div className="p-8 border-b border-app-border bg-purple-50/50">
+            <h2 className="font-serif text-4xl mb-1">Identity</h2>
+            <p className="text-sm text-text-pale font-medium uppercase tracking-widest">Claim Your @Username</p>
           </div>
 
-          <div className="p-6 space-y-5">
+          <div className="p-8 space-y-8">
             {/* Current Username */}
-            {myUsername && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="p-4 bg-neon-green/10 border border-neon-green/30 rounded-lg"
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="w-2 h-2 bg-neon-green rounded-full animate-pulse" />
-                  <span className="font-mono text-xs text-neon-green tracking-wider">IDENTITY CLAIMED</span>
-                </div>
-                <p className="font-display font-bold text-2xl text-white">@{myUsername}</p>
-              </motion.div>
-            )}
+            <AnimatePresence>
+              {myUsername && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-6 bg-emerald-50 border border-emerald-100 rounded-2xl"
+                >
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center text-white text-xs">✓</div>
+                    <span className="text-xs font-bold text-emerald-700 uppercase tracking-widest">Identity Claimed</span>
+                  </div>
+                  <p className="font-serif text-4xl text-emerald-800">@{myUsername}</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Username Input */}
-            <div>
-              <label className="block font-mono text-xs text-text-muted mb-2 tracking-wider">
-                CHOOSE YOUR USERNAME
-              </label>
-              <div className="flex items-center px-4 py-3 bg-terminal-bg border border-terminal-border rounded-lg focus-within:border-neon-cyan focus-within:ring-2 focus-within:ring-neon-cyan/20 transition-all duration-300">
-                <span className="text-neon-pink text-lg mr-1 select-none font-mono">@</span>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(event) => {
-                    setUsername(event.target.value);
-                    setAvailability('');
-                  }}
-                  placeholder="yourname"
-                  maxLength={20}
-                  className="flex-1 bg-transparent !border-none !outline-none !ring-0 !shadow-none font-mono text-white placeholder-text-muted p-0 focus:ring-0 focus:outline-none focus:border-none"
-                  style={{ outline: 'none', boxShadow: 'none', border: 'none' }}
-                  disabled={!!myUsername}
-                />
-              </div>
-              <p className="font-mono text-xs text-text-muted mt-2">3-20 characters, letters and numbers only</p>
-            </div>
-
-            {/* Availability Status */}
-            {availability && (
-              <motion.div
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`p-3 rounded-lg border ${availability === 'available'
-                  ? 'bg-neon-green/10 border-neon-green/30'
-                  : 'bg-status-error/10 border-status-error/30'
-                  }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className={availability === 'available' ? 'text-neon-green' : 'text-status-error'}>
-                    {availability === 'available' ? '✓' : '✗'}
-                  </span>
-                  <span className={`font-mono text-sm ${availability === 'available' ? 'text-neon-green' : 'text-status-error'
-                    }`}>
-                    {availability === 'available' ? 'Username available!' : 'Username taken'}
-                  </span>
+            {!myUsername && (
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-text-pale uppercase tracking-widest">
+                  Choose Your Username
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-serif text-purple-400">@</span>
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(event) => {
+                      setUsername(event.target.value);
+                      setAvailability('');
+                    }}
+                    placeholder="yourname"
+                    maxLength={20}
+                    className="input-premium pl-12 text-2xl font-serif h-16"
+                  />
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                    {availability === 'available' && <span className="text-emerald-500 text-xl font-bold">✓</span>}
+                    {availability === 'taken' && <span className="text-red-500 text-xl font-bold">×</span>}
+                  </div>
                 </div>
-              </motion.div>
+                <p className="text-xs text-text-pale">3-20 characters, letters and numbers only</p>
+              </div>
             )}
 
-            {/* Actions */}
+            {/* Availability Status */}
+            <AnimatePresence>
+              {availability && !myUsername && (
+                <motion.div
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`p-4 rounded-2xl border ${availability === 'available'
+                    ? 'bg-emerald-50 border-emerald-100 text-emerald-700'
+                    : 'bg-red-50 border-red-100 text-red-700'
+                    }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">{availability === 'available' ? '✓' : '×'}</span>
+                    <span className="text-sm font-bold">
+                      {availability === 'available' ? 'Username available!' : 'Username taken'}
+                    </span>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Register Button */}
             {!myUsername && (
-              <motion.button
-                whileHover={{ scale: loading ? 1 : 1.02 }}
-                whileTap={{ scale: loading ? 1 : 0.98 }}
+              <button
                 onClick={handleRegister}
                 disabled={loading || !username.trim() || availability !== 'available'}
-                className="w-full btn-neon-solid py-3 text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full h-16 bg-purple-600 text-white rounded-full font-bold text-lg transition-all duration-300 hover:bg-purple-700 shadow-premium active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-3"
               >
                 {loading ? (
-                  <>
-                    <span className="spinner" />
-                    REGISTERING...
-                  </>
+                  <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  'REGISTER'
+                  <>
+                    <span>Register Identity</span>
+                    <span>→</span>
+                  </>
                 )}
-              </motion.button>
+              </button>
             )}
 
             {/* Benefits */}
-            <div className="pt-4 border-t border-terminal-border">
-              <p className="font-mono text-xs text-text-muted mb-3">BENEFITS</p>
-              <ul className="space-y-2">
+            <div className="pt-6 border-t border-app-border">
+              <p className="text-[10px] font-bold text-text-pale uppercase tracking-widest mb-4">Benefits</p>
+              <ul className="grid grid-cols-2 gap-3">
                 {[
-                  'Easy to share and remember',
-                  'Send/receive with @username',
-                  'Stored on-chain forever',
-                  'Professional payment links',
+                  'Easy to share',
+                  'Send/receive with @name',
+                  'Stored on-chain',
+                  'Payment links',
                 ].map((benefit) => (
-                  <li key={benefit} className="flex items-center gap-2 font-mono text-xs text-text-secondary">
-                    <span className="text-neon-green">✓</span>
+                  <li key={benefit} className="flex items-center gap-2 text-sm text-text-dim">
+                    <span className="w-5 h-5 bg-emerald-50 rounded-lg flex items-center justify-center text-emerald-600 text-[10px]">✓</span>
                     {benefit}
                   </li>
                 ))}
@@ -326,81 +317,80 @@ export const UsernameRegistry = () => {
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
-          className="terminal-card overflow-hidden"
+          className="card-premium p-0 overflow-hidden"
         >
-          {/* Header */}
-          <div className="px-6 py-4 border-b border-terminal-border bg-terminal-bg/50">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-neon-cyan/10 border border-neon-cyan/50 rounded-lg flex items-center justify-center">
-                <span className="text-neon-cyan text-xl">🔍</span>
-              </div>
-              <div>
-                <h2 className="font-display font-bold text-lg text-white">LOOKUP USER</h2>
-                <p className="font-mono text-xs text-text-muted">Find address by @username</p>
-              </div>
-            </div>
+          <div className="p-8 border-b border-app-border bg-app-hover/30">
+            <h2 className="font-serif text-4xl mb-1">Lookup</h2>
+            <p className="text-sm text-text-pale font-medium uppercase tracking-widest">Find Address by Username</p>
           </div>
 
-          <div className="p-6 space-y-5">
+          <div className="p-8 space-y-8">
             {/* Lookup Input */}
-            <div>
-              <label className="block font-mono text-xs text-text-muted mb-2 tracking-wider">
-                ENTER USERNAME
+            <div className="space-y-3">
+              <label className="text-xs font-bold text-text-pale uppercase tracking-widest">
+                Enter Username
               </label>
-              <div className="flex items-center px-4 py-3 bg-terminal-bg border border-terminal-border rounded-lg focus-within:border-neon-cyan focus-within:ring-2 focus-within:ring-neon-cyan/20 transition-all duration-300 relative">
-                <span className="text-neon-cyan text-lg mr-1 select-none font-mono">@</span>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-serif text-accent-indigo">@</span>
                 <input
                   type="text"
                   value={lookup}
                   onChange={(event) => setLookup(event.target.value)}
                   placeholder="alice"
-                  className="flex-1 bg-transparent !border-none !outline-none !ring-0 !shadow-none font-mono text-white placeholder-text-muted p-0 focus:ring-0 focus:outline-none focus:border-none"
-                  style={{ outline: 'none', boxShadow: 'none', border: 'none' }}
+                  className="input-premium pl-12 text-2xl font-serif h-16"
                 />
-                {lookingUp && <div className="spinner w-4 h-4 border-2" />}
+                {lookingUp && (
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 border-2 border-accent-indigo border-t-transparent rounded-full animate-spin" />
+                )}
               </div>
             </div>
 
             {/* Result */}
-            {lookupResult && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`p-4 rounded-lg border ${lookupResult === 'Not found'
-                  ? 'bg-status-error/10 border-status-error/30'
-                  : 'bg-terminal-bg border-terminal-border'
-                  }`}
-              >
-                <p className="font-mono text-xs text-text-muted mb-2">RESULT FOR @{lookup}</p>
-                {lookupResult === 'Not found' ? (
-                  <div className="flex items-center gap-2 text-status-error">
-                    <span>✗</span>
-                    <p className="font-mono text-sm">Username does not exist</p>
+            <AnimatePresence mode="wait">
+              {lookupResult ? (
+                <motion.div
+                  key="result"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className={`p-6 rounded-2xl border ${lookupResult === 'Not found'
+                    ? 'bg-red-50 border-red-100'
+                    : 'bg-app-bg/50 border-app-border'
+                    }`}
+                >
+                  <p className="text-[10px] font-bold text-text-pale uppercase tracking-widest mb-3">Result for @{lookup}</p>
+                  {lookupResult === 'Not found' ? (
+                    <div className="flex items-center gap-3 text-red-600">
+                      <span className="text-xl">×</span>
+                      <p className="font-bold">Username does not exist</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-xs font-mono text-text-dim break-all mb-4 p-3 bg-white rounded-xl border border-app-border">{lookupResult}</p>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(lookupResult)}
+                        className="text-xs font-bold text-accent-indigo hover:underline uppercase tracking-widest"
+                      >
+                        Copy Address →
+                      </button>
+                    </div>
+                  )}
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="py-16 text-center"
+                >
+                  <div className="w-20 h-20 bg-app-bg border-2 border-dashed border-app-border rounded-3xl flex items-center justify-center mx-auto mb-6">
+                    <span className="text-4xl text-text-pale">🔍</span>
                   </div>
-                ) : (
-                  <div>
-                    <p className="font-mono text-xs text-text-secondary break-all">{lookupResult}</p>
-                    <button
-                      onClick={() => navigator.clipboard.writeText(lookupResult)}
-                      className="mt-2 font-mono text-xs text-neon-cyan hover:underline"
-                    >
-                      Copy address
-                    </button>
-                  </div>
-                )}
-              </motion.div>
-            )}
-
-            {/* Empty State */}
-            {!lookupResult && !lookingUp && (
-              <div className="py-12 text-center">
-                <div className="w-20 h-20 bg-terminal-bg border-2 border-dashed border-terminal-border rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <span className="text-3xl text-text-muted">🔍</span>
-                </div>
-                <p className="font-mono text-sm text-text-muted">Enter a username to find</p>
-                <p className="font-mono text-xs text-text-muted">their Stacks address</p>
-              </div>
-            )}
+                  <p className="font-serif text-xl text-text-pale mb-1">Enter a username</p>
+                  <p className="text-xs text-text-pale uppercase tracking-widest">to find their Stacks address</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </motion.div>
       </div>
