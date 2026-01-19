@@ -156,15 +156,25 @@ export const PaymentHistory = () => {
       void fetchPendingClaims();
 
       try {
-        const response = await fetch(
-          `https://api.testnet.hiro.so/extended/v1/address/${address}/transactions?limit=50`
-        );
-        const data = await response.json();
+        const [confirmedRes, mempoolRes] = await Promise.all([
+          fetch(`https://api.testnet.hiro.so/extended/v1/address/${address}/transactions?limit=50`),
+          fetch(`https://api.testnet.hiro.so/extended/v1/address/${address}/mempool?limit=50`)
+        ]);
+
+        const confirmedData = await confirmedRes.json();
+        const mempoolData = await mempoolRes.json();
+
+        // Combine confirmed and mempool transactions
+        const allTxs = [
+          ...(mempoolData.results || []).map((tx: any) => ({ ...tx, block_time: tx.receipt_time || Date.now() / 1000, tx_status: 'pending' })),
+          ...(confirmedData.results || [])
+        ];
 
         const items: PaymentItem[] = [];
         const requestStatusMap: Record<string, 'completed' | 'cancelled' | 'paid'> = {};
 
-        for (const tx of data.results as Transaction[]) {
+        // First pass: identify final states of requests
+        for (const tx of allTxs as Transaction[]) {
           if (tx.contract_call?.contract_id === `${PAYMENT_CONTRACT_ADDRESS}.${PAYMENT_CONTRACT_NAME}` && tx.tx_status === 'success') {
             const functionName = tx.contract_call.function_name;
             const args = tx.contract_call.function_args;
@@ -182,20 +192,23 @@ export const PaymentHistory = () => {
           }
         }
 
-        for (const tx of data.results as Transaction[]) {
+        for (const tx of allTxs as Transaction[]) {
           if (tx.contract_call?.contract_id === `${PAYMENT_CONTRACT_ADDRESS}.${PAYMENT_CONTRACT_NAME}`) {
             const functionName = tx.contract_call.function_name;
 
-            if (functionName === 'create-payment-request') {
+            if (functionName === 'create-payment-request' || functionName === 'create-invoice-request') {
+              const isInvoice = functionName === 'create-invoice-request';
               const args = tx.contract_call.function_args;
               const requestId = args[0]?.repr?.replace(/"/g, '') || tx.tx_id.substring(0, 8);
               const recipient = args[1]?.repr || '';
               const amount = parseInt(args[2]?.repr?.replace('u', '') || '0') / 1_000_000;
-              const memo = args[3]?.repr?.replace(/"/g, '') || 'Payment Request';
+              const memo = args[3]?.repr?.replace(/"/g, '') || (isInvoice ? 'Invoice' : 'Payment Request');
 
               let currentStatus = 'pending';
-              if (tx.tx_status !== 'success') currentStatus = 'failed';
-              else if (requestStatusMap[requestId]) currentStatus = requestStatusMap[requestId];
+              if (tx.tx_status === 'abort_by_response' || tx.tx_status === 'abort_by_post_condition') currentStatus = 'failed';
+              else if (tx.tx_status === 'success' && requestStatusMap[requestId]) currentStatus = requestStatusMap[requestId];
+
+              if (tx.tx_status === 'pending') currentStatus = 'pending';
 
               items.push({
                 id: requestId,
@@ -227,7 +240,7 @@ export const PaymentHistory = () => {
                 txId: tx.tx_id,
                 amount,
                 recipient: tx.sender_address,
-                sender: sender,
+                sender: sender, // This might be elusive in mempool without events, but we try
                 memo: 'Payment Claimed',
                 status: tx.tx_status === 'success' ? 'completed' : tx.tx_status === 'pending' ? 'pending' : 'failed',
                 timestamp: tx.block_time * 1000,
@@ -250,6 +263,25 @@ export const PaymentHistory = () => {
                 status: tx.tx_status === 'success' ? 'completed' : tx.tx_status === 'pending' ? 'pending' : 'failed',
                 timestamp: tx.block_time * 1000,
                 type: tx.sender_address === address ? 'sent' : 'received',
+              });
+            }
+          } else if (tx.contract_call?.contract_id === `${USERNAME_CONTRACT_ADDRESS}.${USERNAME_CONTRACT_NAME}`) {
+            // Handle Username Registry interactions
+            const functionName = tx.contract_call.function_name;
+            if (functionName === 'register-username') {
+              const args = tx.contract_call.function_args;
+              const name = args[0]?.repr?.replace(/"/g, '') || 'Identity';
+
+              items.push({
+                id: tx.tx_id,
+                txId: tx.tx_id,
+                amount: 0,
+                recipient: tx.contract_call.contract_id,
+                sender: tx.sender_address,
+                memo: `Identity Claim: @${name}`,
+                status: tx.tx_status === 'success' ? 'completed' : tx.tx_status === 'pending' ? 'pending' : 'failed',
+                timestamp: tx.block_time * 1000,
+                type: 'sent',
               });
             }
           }
