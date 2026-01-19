@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useWallet } from '../hooks/useWallet';
 import { bridgeUSDCFromEthereum, pollBridgeStatus } from '../utils/bridgeUtils';
 
@@ -72,7 +72,6 @@ export const BridgeInterface = () => {
     setAmount(tx.amount.toString());
     setBridgeStatus(tx.status);
 
-    // Resume polling if pending
     if (tx.status === 'pending') {
       setBridging(true);
       pollBridgeStatus(tx.hash, (status) => {
@@ -92,341 +91,216 @@ export const BridgeInterface = () => {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="grid lg:grid-cols-2 gap-6">
+    <div className="max-w-5xl mx-auto">
+      <div className="grid lg:grid-cols-5 gap-8 items-start">
         {/* Bridge Form */}
         <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="terminal-card overflow-hidden"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="lg:col-span-3 card-premium p-0 overflow-hidden"
         >
-          {/* Header */}
-          <div className="px-6 py-4 border-b border-terminal-border bg-terminal-bg/50">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-neon-magenta/10 border border-neon-magenta/50 rounded-lg flex items-center justify-center">
-                <span className="text-neon-magenta text-xl">⇌</span>
+          <div className="p-8 border-b border-app-border bg-app-hover/30">
+            <h2 className="font-serif text-4xl mb-1">Bridge</h2>
+            <p className="text-sm text-text-pale font-medium uppercase tracking-widest">Cross-Chain Asset Transfer</p>
+            
+            {/* Visual Flow */}
+            <div className="mt-8 p-6 bg-white border border-app-border rounded-3xl flex items-center justify-between gap-4">
+              <div className="text-center">
+                <div className="w-14 h-14 bg-blue-50 border border-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-2 text-xl shadow-premium">
+                  💎
+                </div>
+                <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">Ethereum</p>
+                <p className="text-xs font-bold text-text-main">USDC</p>
               </div>
-              <div>
-                <h2 className="font-display font-bold text-lg text-white">BRIDGE ASSETS</h2>
-                <p className="font-mono text-xs text-text-muted">Ethereum → Stacks</p>
+
+              <div className="flex-1 flex flex-col items-center gap-2">
+                <div className="w-full h-px bg-gradient-to-r from-blue-400 via-accent-indigo to-emerald-400 relative">
+                  <motion.div
+                    animate={{ x: ['-50%', '150%'] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                    className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-accent-indigo rounded-full shadow-glow-indigo border-2 border-white"
+                  />
+                </div>
+                <span className="text-[10px] font-bold text-text-pale uppercase tracking-[0.2em]">Interchain</span>
+              </div>
+
+              <div className="text-center">
+                <div className="w-14 h-14 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-2 text-xl shadow-premium">
+                  ⚡
+                </div>
+                <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Stacks</p>
+                <p className="text-xs font-bold text-text-main">USDCx</p>
               </div>
             </div>
           </div>
 
-          <div className="p-6 space-y-6">
-            {/* Chain Flow Visual */}
-            <div className="flex items-center justify-between p-4 bg-terminal-bg rounded-lg border border-terminal-border">
-              <div className="text-center">
-                <div className="w-12 h-12 bg-neon-magenta/10 border border-neon-magenta/50 rounded-lg flex items-center justify-center mx-auto mb-2">
-                  <span className="font-display font-bold text-neon-magenta">ETH</span>
-                </div>
-                <p className="font-mono text-xs text-text-muted">USDC</p>
-              </div>
-
-              <div className="flex-1 flex items-center justify-center px-4">
-                <div className="w-full h-0.5 bg-gradient-to-r from-neon-magenta via-neon-cyan to-neon-green relative">
-                  <motion.div
-                    animate={{ x: ['0%', '100%'] }}
-                    transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                    className="absolute top-1/2 -translate-y-1/2 w-2 h-2 bg-neon-cyan rounded-full shadow-neon-cyan"
-                  />
-                </div>
-              </div>
-
-              <div className="text-center">
-                <div className="w-12 h-12 bg-neon-green/10 border border-neon-green/50 rounded-lg flex items-center justify-center mx-auto mb-2">
-                  <span className="font-display font-bold text-neon-green">STX</span>
-                </div>
-                <p className="font-mono text-xs text-text-muted">USDCx</p>
-              </div>
-            </div>
-
+          <div className="p-8 space-y-8">
             {/* Amount Input */}
-            <div>
-              <label className="block font-mono text-xs text-text-muted mb-2 tracking-wider">
-                AMOUNT (USDC)
-              </label>
-              <div className="relative flex items-center px-4 py-3 bg-terminal-bg border border-terminal-border rounded-lg focus-within:border-neon-magenta focus-within:ring-2 focus-within:ring-neon-magenta/20 transition-all duration-300">
-                <span className="text-neon-magenta text-xl font-display mr-1">$</span>
+            <div className="space-y-3">
+              <label className="text-xs font-bold text-text-pale uppercase tracking-widest">Amount to Bridge</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-serif text-text-pale">$</span>
                 <input
                   type="number"
                   value={amount}
-                  onChange={(event) => setAmount(event.target.value)}
+                  onChange={(e) => setAmount(e.target.value)}
                   placeholder="0.00"
                   step="0.01"
                   min="1"
-                  className="flex-1 bg-transparent !border-none !outline-none !ring-0 !shadow-none text-xl font-display text-white placeholder-text-muted p-0"
-                  style={{ outline: 'none', boxShadow: 'none', border: 'none' }}
+                  className="input-premium pl-10 pr-20 text-3xl font-serif text-accent-indigo h-16"
                   disabled={bridging}
                 />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-text-pale uppercase tracking-widest">
+                  USDC
+                </span>
               </div>
-              <p className="font-mono text-xs text-text-muted mt-2">Minimum: 1 USDC</p>
             </div>
 
-            {/* Destination */}
-            <div>
-              <label className="block font-mono text-xs text-text-muted mb-2 tracking-wider">
-                DESTINATION (STACKS)
-              </label>
-              <div className="p-3 bg-terminal-bg rounded-lg border border-terminal-border">
-                <p className="font-mono text-xs text-text-secondary break-all">
-                  {address || 'Connect Stacks wallet first'}
+            {/* Destination Info */}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="p-4 bg-app-bg/50 rounded-2xl border border-app-border">
+                <p className="text-[10px] font-bold text-text-pale uppercase tracking-widest mb-2">From Ethereum</p>
+                <p className="text-xs font-mono text-text-dim truncate">
+                  {ethAddress || 'Not Connected'}
+                </p>
+              </div>
+              <div className="p-4 bg-app-bg/50 rounded-2xl border border-app-border">
+                <p className="text-[10px] font-bold text-text-pale uppercase tracking-widest mb-2">To Stacks</p>
+                <p className="text-xs font-mono text-text-dim truncate">
+                  {address || 'Not Connected'}
                 </p>
               </div>
             </div>
 
-            {/* ETH Wallet Status */}
+            {/* Action Button */}
             {!ethAddress ? (
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={connectEthereumWallet}
-                className="w-full py-3 bg-neon-magenta/10 border border-neon-magenta/50 rounded-lg
-                           font-mono text-sm text-neon-magenta
-                           hover:bg-neon-magenta hover:text-terminal-bg transition-all duration-300"
-              >
-                CONNECT ETHEREUM WALLET
-              </motion.button>
+              <button onClick={connectEthereumWallet} className="w-full btn-secondary h-16 text-lg">
+                Connect Ethereum Wallet
+              </button>
             ) : (
-              <div className="flex items-center gap-2 p-3 bg-neon-magenta/10 border border-neon-magenta/30 rounded-lg">
-                <span className="w-2 h-2 bg-neon-magenta rounded-full animate-pulse" />
-                <span className="font-mono text-xs text-neon-magenta">
-                  ETH: {ethAddress.substring(0, 6)}...{ethAddress.substring(ethAddress.length - 4)}
-                </span>
-              </div>
+              <button
+                onClick={handleBridge}
+                disabled={bridging || !amount || !address}
+                className="w-full btn-primary h-16 text-lg flex items-center justify-center gap-3"
+              >
+                {bridging ? (
+                  <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <span>Confirm Bridge Transfer</span>
+                    <span>⇌</span>
+                  </>
+                )}
+              </button>
             )}
 
-            {/* Bridge Button */}
-            <motion.button
-              whileHover={{ scale: bridging ? 1 : 1.02 }}
-              whileTap={{ scale: bridging ? 1 : 0.98 }}
-              onClick={handleBridge}
-              disabled={bridging || !amount || !address || !ethAddress}
-              className="w-full btn-neon-solid py-4 text-base flex items-center justify-center gap-3"
-            >
-              {bridging ? (
-                <>
-                  <span className="spinner" />
-                  BRIDGING...
-                </>
-              ) : (
-                <>
-                  <span>⇌</span>
-                  START BRIDGE
-                </>
-              )}
-            </motion.button>
-
-            {/* Fee Info */}
-            <div className="p-3 bg-status-warning/10 border border-status-warning/30 rounded-lg">
-              <div className="flex items-start gap-2">
-                <span className="text-status-warning">⚡</span>
-                <div className="font-mono text-xs text-text-muted">
-                  <p>Bridge fee: ~$4.80 USD (ETH gas)</p>
-                  <p>Estimated time: 2-5 minutes</p>
-                </div>
+            {/* Fees Note */}
+            <div className="flex items-start gap-4 p-4 bg-amber-50 border border-amber-100 rounded-2xl">
+              <span className="text-xl">⛽</span>
+              <div className="text-xs text-amber-800 leading-relaxed font-medium">
+                Ethereum network fees apply. Bridging typically takes 2-5 minutes depending on network congestion.
               </div>
             </div>
           </div>
         </motion.div>
 
         {/* Status Panel */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="terminal-card overflow-hidden"
-        >
-          {/* Header */}
-          <div className="px-6 py-4 border-b border-terminal-border bg-terminal-bg/50">
-            <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${bridgeStatus ? 'bg-neon-cyan animate-pulse' : 'bg-text-muted'}`} />
-              <span className="font-mono text-xs text-text-muted tracking-wider">
-                {bridgeStatus ? 'BRIDGE IN PROGRESS' : 'AWAITING BRIDGE'}
-              </span>
-            </div>
-          </div>
-
-          <div className="p-6">
+        <div className="lg:col-span-2 space-y-6">
+          <AnimatePresence mode="wait">
             {bridgeStatus ? (
-              <div className="space-y-6">
-                {/* Progress Steps */}
-                <div className="space-y-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="card-premium p-8"
+              >
+                <h3 className="font-serif text-2xl mb-8">Process Status</h3>
+                
+                <div className="space-y-8 relative">
+                  {/* Vertical line connector */}
+                  <div className="absolute left-6 top-6 bottom-6 w-px bg-app-border -z-10" />
+                  
                   {steps.map((step, i) => (
-                    <motion.div
-                      key={step.label}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.1 }}
-                      className="flex items-center gap-4"
-                    >
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center border-2 ${step.status === 'complete'
-                        ? 'bg-neon-green/10 border-neon-green text-neon-green'
+                    <div key={step.label} className="flex items-center gap-6">
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 transition-all duration-500 ${step.status === 'complete'
+                        ? 'bg-emerald-500 border-emerald-500 text-white shadow-premium'
                         : step.status === 'active'
-                          ? 'bg-neon-cyan/10 border-neon-cyan text-neon-cyan animate-pulse'
-                          : 'bg-terminal-bg border-terminal-border text-text-muted'
+                          ? 'bg-white border-accent-indigo text-accent-indigo shadow-glow-indigo animate-soft-pulse'
+                          : 'bg-white border-app-border text-text-pale'
                         }`}>
-                        {step.status === 'complete' ? '✓' : step.status === 'active' ? '◎' : i + 1}
+                        {step.status === 'complete' ? '✓' : i + 1}
                       </div>
                       <div>
-                        <p className={`font-mono text-sm ${step.status === 'complete'
-                          ? 'text-neon-green'
-                          : step.status === 'active'
-                            ? 'text-neon-cyan'
-                            : 'text-text-muted'
-                          }`}>
+                        <p className={`text-[10px] font-bold uppercase tracking-widest ${
+                          step.status === 'complete' ? 'text-emerald-600' :
+                          step.status === 'active' ? 'text-accent-indigo' : 'text-text-pale'
+                        }`}>
                           {step.label}
                         </p>
-                        <p className="font-mono text-xs text-text-muted">
-                          {step.status === 'complete' ? 'CONFIRMED' : step.status === 'active' ? 'PROCESSING...' : 'WAITING'}
+                        <p className="text-sm font-bold text-text-main">
+                          {step.status === 'complete' ? 'Confirmed' : 
+                           step.status === 'active' ? 'In Progress...' : 'Awaiting...'}
                         </p>
                       </div>
-                    </motion.div>
+                    </div>
                   ))}
                 </div>
 
-                {/* Status */}
-                <div className={`p-4 rounded-lg border ${bridgeStatus === 'completed'
-                  ? 'bg-neon-green/10 border-neon-green/30'
-                  : bridgeStatus === 'failed'
-                    ? 'bg-status-error/10 border-status-error/30'
-                    : 'bg-neon-cyan/10 border-neon-cyan/30'
+                <div className="mt-12 space-y-4">
+                  <div className={`p-4 rounded-2xl text-center ${
+                    bridgeStatus === 'completed' ? 'bg-emerald-50 text-emerald-700' : 'bg-accent-indigo/5 text-accent-indigo'
                   }`}>
-                  <p className={`font-display font-bold text-lg ${bridgeStatus === 'completed'
-                    ? 'text-neon-green'
-                    : bridgeStatus === 'failed'
-                      ? 'text-status-error'
-                      : 'text-neon-cyan'
-                    }`}>
-                    {bridgeStatus.toUpperCase()}
-                  </p>
-                  {bridgeStatus === 'completed' && (
-                    <p className="font-mono text-xs text-neon-green mt-2">
-                      Bridging process was done, the USDCx token amount will be received in a few mins due to bridging.
-                    </p>
-                  )}
-                </div>
-
-                {/* TX Hash */}
-                {txHash && (
-                  <div className="p-3 bg-terminal-bg rounded-lg border border-terminal-border">
-                    <p className="font-mono text-xs text-text-muted mb-2">ETHEREUM TX</p>
+                    <p className="text-sm font-bold uppercase tracking-widest">{bridgeStatus}</p>
+                  </div>
+                  
+                  {txHash && (
                     <a
                       href={`https://sepolia.etherscan.io/tx/${txHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="font-mono text-xs text-neon-magenta hover:underline break-all"
+                      className="block text-center text-[10px] font-bold text-text-pale hover:text-accent-indigo uppercase tracking-widest underline"
                     >
-                      {txHash} ↗
+                      View Etherscan ↗
                     </a>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center py-16 text-center">
-                <div className="w-24 h-24 bg-terminal-bg border-2 border-dashed border-terminal-border rounded-xl flex items-center justify-center mb-4">
-                  <span className="text-4xl text-text-muted">⇌</span>
+                  )}
                 </div>
-                <p className="font-mono text-sm text-text-muted">Enter amount and initiate</p>
-                <p className="font-mono text-xs text-text-muted">bridge to see status</p>
+              </motion.div>
+            ) : (
+              <div className="card-premium p-12 text-center border-dashed border-2 flex flex-col items-center justify-center h-full min-h-[400px]">
+                <div className="w-20 h-20 bg-app-bg rounded-3xl flex items-center justify-center mb-6">
+                  <span className="text-4xl text-text-pale">⇌</span>
+                </div>
+                <h3 className="font-serif text-2xl mb-2 text-text-pale">Active Bridge</h3>
+                <p className="text-xs text-text-pale leading-relaxed max-w-[180px]">Initiate a transfer to track your cross-chain assets here</p>
               </div>
             )}
-          </div>
-        </motion.div>
-      </div>
+          </AnimatePresence>
 
-      {/* History Section */}
-      {history.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-6 terminal-card overflow-hidden"
-        >
-          <div className="px-6 py-4 border-b border-terminal-border bg-terminal-bg/50">
-            <h3 className="font-display font-bold text-lg text-white">HISTORY</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-terminal-border bg-terminal-bg/30">
-                  <th className="px-6 py-3 font-mono text-xs text-text-muted">DATE</th>
-                  <th className="px-6 py-3 font-mono text-xs text-text-muted">AMOUNT</th>
-                  <th className="px-6 py-3 font-mono text-xs text-text-muted">TX HASH</th>
-                  <th className="px-6 py-3 font-mono text-xs text-text-muted">STATUS</th>
-                  <th className="px-6 py-3 font-mono text-xs text-text-muted">ACTION</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-terminal-border">
-                {history.map((tx) => (
-                  <tr key={tx.hash} className="hover:bg-terminal-bg/50 transition-colors">
-                    <td className="px-6 py-3 font-mono text-sm text-text-muted">
-                      {new Date(tx.date).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-3 font-mono text-sm text-white">
-                      {tx.amount} USDC
-                    </td>
-                    <td className="px-6 py-3 font-mono text-sm text-text-muted">
-                      {tx.hash.substring(0, 6)}...{tx.hash.substring(tx.hash.length - 4)}
-                    </td>
-                    <td className="px-6 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-mono
-                        ${tx.status === 'completed' ? 'bg-neon-green/10 text-neon-green' :
-                          tx.status === 'failed' ? 'bg-status-error/10 text-status-error' :
-                            'bg-neon-cyan/10 text-neon-cyan'}`}>
-                        {tx.status.toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3">
-                      <button
-                        onClick={() => loadHistoryItem(tx)}
-                        className="text-xs font-mono text-neon-magenta hover:underline"
-                      >
-                        VIEW STATUS
-                      </button>
-                    </td>
-                  </tr>
+          {/* History Snippet */}
+          {history.length > 0 && !bridgeStatus && (
+            <div className="card-premium p-6">
+              <h3 className="font-serif text-xl mb-4">Recent Bridges</h3>
+              <div className="space-y-3">
+                {history.slice(0, 3).map((tx) => (
+                  <button
+                    key={tx.hash}
+                    onClick={() => loadHistoryItem(tx)}
+                    className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-app-hover border border-transparent hover:border-app-border transition-all"
+                  >
+                    <div className="text-left">
+                      <p className="text-sm font-bold text-text-main">{tx.amount} USDC</p>
+                      <p className="text-[10px] text-text-pale uppercase tracking-widest">{new Date(tx.date).toLocaleDateString()}</p>
+                    </div>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                      tx.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {tx.status}
+                    </span>
+                  </button>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Info Cards */}
-      <div className="grid md:grid-cols-3 gap-4 mt-6">
-        {[
-          {
-            icon: '💡',
-            title: 'GET TESTNET USDC',
-            description: 'Visit Circle faucet to get free testnet USDC on Sepolia',
-            link: 'https://faucet.circle.com',
-          },
-          {
-            icon: '⛽',
-            title: 'GET TESTNET ETH',
-            description: 'Need Sepolia ETH for gas? Get it from a faucet',
-            link: 'https://sepoliafaucet.com',
-          },
-          {
-            icon: '📖',
-            title: 'HOW IT WORKS',
-            description: 'Learn about USDCx bridging powered by Circle xReserve',
-            link: 'https://docs.stacks.co/learn/bridging/usdcx',
-          },
-        ].map((card) => (
-          <a
-            key={card.title}
-            href={card.link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="terminal-card p-4 group cursor-pointer"
-          >
-            <span className="text-2xl">{card.icon}</span>
-            <h3 className="font-mono text-sm text-white mt-2 group-hover:text-neon-cyan transition-colors">
-              {card.title}
-            </h3>
-            <p className="font-mono text-xs text-text-muted mt-1">{card.description}</p>
-          </a>
-        ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
