@@ -1,4 +1,4 @@
-import { BrowserRouter, Link, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WalletProvider } from './context/WalletContext';
 import { PaymentProvider } from './context/PaymentContext';
@@ -13,6 +13,7 @@ import { UsernameRegistry } from './components/UsernameRegistry';
 import { ContractDebug } from './components/ContractDebug';
 import { useWallet } from './hooks/useWallet';
 import { useState, useEffect } from 'react';
+import { getUsername } from './utils/stacksUtils';
 
 const navLinks = [
   { path: '/send', label: 'Transfer', icon: '↗', description: 'Send USDCx to any address or username', color: 'bg-indigo-50 text-indigo-600' },
@@ -22,6 +23,40 @@ const navLinks = [
   { path: '/username', label: 'Identity', icon: '@', description: 'Claim your unique on-chain name', color: 'bg-purple-50 text-purple-600' },
   { path: '/history', label: 'History', icon: '☰', description: 'View your transaction records', color: 'bg-slate-50 text-slate-600' },
 ];
+
+function AuthManager() {
+  const { isConnected, address } = useWallet();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const checkIdentity = async () => {
+      // Skip if not connected
+      if (!isConnected || !address) return;
+
+      // Skip check if already on identity page
+      if (location.pathname === '/username') return;
+
+      // Check for pending registration to avoid blocking user during confirmation
+      const pendingUsername = localStorage.getItem(`pending_username_${address}`);
+      if (pendingUsername) return;
+
+      // Check contract
+      const username = await getUsername(address);
+      if (!username) {
+        // Enforce identity claim
+        console.log('No identity found, redirecting to /username');
+        navigate('/username');
+      }
+    };
+
+    // Check shortly after connection/mount
+    const timer = setTimeout(checkIdentity, 1000);
+    return () => clearTimeout(timer);
+  }, [isConnected, address, location.pathname, navigate]);
+
+  return null;
+}
 
 function Navigation() {
   const location = useLocation();
@@ -134,6 +169,7 @@ function App() {
     <WalletProvider>
       <PaymentProvider>
         <BrowserRouter>
+          <AuthManager />
           <div className="min-h-screen bg-app-bg grid-subtle selection:bg-accent-indigo/10 selection:text-accent-indigo">
             <Navigation />
             <main className="relative">

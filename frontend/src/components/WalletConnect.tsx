@@ -3,10 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { openContractCall } from '@stacks/connect';
 
 import {
-  cvToJSON,
-  deserializeCV,
-  serializeCV,
-  standardPrincipalCV,
   stringAsciiCV,
 } from '@stacks/transactions';
 import { STACKS_TESTNET } from '@stacks/network';
@@ -14,6 +10,7 @@ import { useWallet } from '../hooks/useWallet';
 import {
   USERNAME_CONTRACT_ADDRESS,
   USERNAME_CONTRACT_NAME,
+  getUsername,
 } from '../utils/stacksUtils';
 
 export const WalletConnect = () => {
@@ -39,39 +36,8 @@ export const WalletConnect = () => {
       }
 
       try {
-        const apiUrl =
-          STACKS_TESTNET.client.baseUrl ?? 'https://api.testnet.hiro.so';
-        const response = await fetch(
-          `${apiUrl}/v2/contracts/call-read/${USERNAME_CONTRACT_ADDRESS}/${USERNAME_CONTRACT_NAME}/get-username`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sender: address,
-              arguments: [
-                `0x${serializeCV(standardPrincipalCV(address))}`,
-              ],
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          setUsername('');
-          return;
-        }
-
-        const result = await response.json();
-        if (!result.okay) {
-          setUsername('');
-          return;
-        }
-        const clarityValue = deserializeCV(result.result);
-        const jsonResult = cvToJSON(clarityValue);
-        if (jsonResult.value) {
-          setUsername(jsonResult.value.value as string);
-        } else {
-          setUsername('');
-        }
+        const name = await getUsername(address);
+        setUsername(name || '');
       } catch {
         setUsername('');
       }

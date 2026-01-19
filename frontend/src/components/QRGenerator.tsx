@@ -159,7 +159,7 @@ export const QRGenerator = () => {
           <div className="p-8 border-b border-app-border bg-app-hover/30">
             <h2 className="font-serif text-4xl mb-1">Request</h2>
             <p className="text-sm text-text-pale font-medium uppercase tracking-widest">Generate Payment Link</p>
-            
+
             <div className="mt-8 flex p-1 bg-white border border-app-border rounded-2xl">
               <button
                 onClick={() => setPaymentType('escrow')}
@@ -222,7 +222,7 @@ export const QRGenerator = () => {
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0.00"
                   step="0.01"
-                  className="input-premium pl-10 pr-20 text-3xl font-serif text-accent-indigo h-16"
+                  className="input-premium !pl-20 pr-20 text-3xl font-serif text-accent-indigo h-16"
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-text-pale uppercase tracking-widest">
                   USDCx
@@ -245,9 +245,8 @@ export const QRGenerator = () => {
             <button
               onClick={generateQR}
               disabled={loading || (paymentType === 'escrow' && !recipient.trim()) || !amount}
-              className={`w-full h-16 rounded-full font-bold text-lg transition-all duration-300 shadow-premium active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-3 ${
-                paymentType === 'escrow' ? 'bg-accent-indigo text-white hover:bg-accent-indigo-hover' : 'bg-accent-gold text-white hover:bg-accent-gold-hover'
-              }`}
+              className={`w-full h-16 rounded-full font-bold text-lg transition-all duration-300 shadow-premium active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-3 ${paymentType === 'escrow' ? 'bg-accent-indigo text-white hover:bg-accent-indigo-hover' : 'bg-accent-gold text-white hover:bg-accent-gold-hover'
+                }`}
             >
               {loading ? (
                 <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
