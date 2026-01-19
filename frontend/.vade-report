@@ -1,0 +1,62 @@
+## Vercel Web Analytics Implementation
+
+### Summary
+Successfully implemented Vercel Web Analytics for the StackPay frontend project. The project uses React with Vite, React Router, and TypeScript.
+
+### Changes Made
+
+#### Modified Files
+1. **frontend/src/App.tsx**
+   - Added import: `import { Analytics } from '@vercel/analytics/react';`
+   - Added `<Analytics />` component inside the `<BrowserRouter>` at the root App level
+   - Placement: After BrowserRouter opens, before AuthManager and other route handlers
+   - This ensures analytics tracking is enabled for all routes in the application
+
+2. **frontend/package.json**
+   - Added `@vercel/analytics` (v1.6.1) to dependencies
+
+3. **frontend/pnpm-lock.yaml**
+   - Updated with new dependency and its transitive dependencies
+
+### Implementation Details
+
+**Framework:** React with TypeScript and Vite
+**Analytics Version:** @vercel/analytics@1.6.1 (latest)
+**Integration Approach:** React component wrapper for seamless integration
+
+The Analytics component was placed inside the BrowserRouter to ensure:
+- All route transitions are tracked
+- Page views are automatically recorded
+- User interactions can be monitored
+- No route support limitations (unlike the `inject()` function)
+
+### How It Works
+
+1. **Automatic Route Tracking:** The Analytics component automatically detects route changes through React Router and sends them to Vercel's analytics endpoint
+2. **Page View Recording:** Each time a user navigates to a different page, a page view is recorded
+3. **Network Tab:** When deployed to Vercel, network requests to `/_vercel/insights/view` and `/_vercel/insights/script.js` will be visible in the browser's Network tab
+4. **Data Dashboard:** Once deployed to Vercel and receiving traffic, analytics data will be available in the Vercel dashboard under the Analytics tab
+
+### Verification
+
+- ✅ Build completes successfully with no new errors
+- ✅ Package installed correctly (v1.6.1)
+- ✅ Import statement properly formatted
+- ✅ Analytics component correctly placed in component tree
+- ✅ Lockfile updated with new dependencies
+
+### Prerequisites for Full Functionality
+
+To fully enable Vercel Web Analytics:
+1. Project must be deployed to Vercel
+2. Analytics must be enabled in the Vercel dashboard (Analytics tab → Enable)
+3. After deployment, the app will start sending analytics data automatically
+4. Data will begin appearing in the Vercel dashboard after initial traffic
+
+### Next Steps
+
+After deployment to Vercel:
+1. Visit the Vercel dashboard and enable Web Analytics (if not already enabled)
+2. Monitor the Analytics tab for visitor data, page views, and other metrics
+3. Use the filtering tools to analyze performance and user behavior
+4. For advanced tracking, custom events can be added using the `track()` function from `@vercel/analytics/react`
