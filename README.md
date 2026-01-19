@@ -17,7 +17,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Build-Vite-646CFF?style=flat-square&logo=vite)](https://vitejs.dev/)
 
-[Live Demo](https://stackspay-pro.vercel.app/) | [Video Link](#-documentation) | [GitHub](https://github.com/NikhilRaikwar/StackPay)
+[Live Demo](https://stackspay-pro.vercel.app/) | [Video Link](https://youtu.be/M06o_ZFQtzE) | [GitHub](https://github.com/NikhilRaikwar/StackPay)
 
 ---
 
