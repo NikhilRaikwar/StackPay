@@ -165,7 +165,7 @@ export const SendPayment = () => {
               <label className="text-xs font-bold text-text-pale uppercase tracking-widest">Recipient</label>
               <AnimatePresence>
                 {recipientStatus === 'valid' && (
-                  <motion.span 
+                  <motion.span
                     initial={{ opacity: 0, x: 5 }}
                     animate={{ opacity: 1, x: 0 }}
                     className="text-[10px] font-bold text-emerald-500 uppercase flex items-center gap-1"
@@ -205,7 +205,7 @@ export const SendPayment = () => {
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
                 step="0.01"
-                className="input-premium pl-10 pr-20 text-3xl font-serif text-accent-indigo h-16"
+                className="input-premium !pl-20 pr-20 text-3xl font-serif text-accent-indigo h-16"
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-text-pale uppercase tracking-widest">
                 USDCx

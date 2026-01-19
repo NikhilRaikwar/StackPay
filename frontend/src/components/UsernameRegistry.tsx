@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { openContractCall } from '@stacks/connect';
 import {
   cvToJSON,
   deserializeCV,
   serializeCV,
-  standardPrincipalCV,
   stringAsciiCV,
 } from '@stacks/transactions';
 import { STACKS_TESTNET } from '@stacks/network';
@@ -13,6 +13,7 @@ import { useWallet } from '../hooks/useWallet';
 import {
   USERNAME_CONTRACT_ADDRESS,
   USERNAME_CONTRACT_NAME,
+  getUsername,
 } from '../utils/stacksUtils';
 import { db, isFirebaseConfigured } from '../utils/firebase';
 import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
@@ -27,7 +28,13 @@ const callReadOnly = async (functionName: string, args: any[]) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sender: 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM',
-        arguments: args.map((arg) => `0x${serializeCV(arg)}`),
+        arguments: args.map((arg) => {
+          const serialized = serializeCV(arg);
+          const hex = typeof serialized === 'string'
+            ? serialized
+            : Array.from(serialized).map((b) => (b as number).toString(16).padStart(2, '0')).join('');
+          return `0x${hex}`;
+        }),
       }),
     }
   );
@@ -46,6 +53,7 @@ const callReadOnly = async (functionName: string, args: any[]) => {
 
 export const UsernameRegistry = () => {
   const { address, isConnected } = useWallet();
+  const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [lookup, setLookup] = useState('');
   const [lookupResult, setLookupResult] = useState<string>('');
@@ -58,11 +66,11 @@ export const UsernameRegistry = () => {
     const loadMyUsername = async () => {
       if (!address) return;
       try {
-        const result = await callReadOnly('get-username', [
-          standardPrincipalCV(address),
-        ]);
-        if (result.value) {
-          setMyUsername(result.value.value as string);
+        const name = await getUsername(address);
+        if (name) {
+          setMyUsername(name);
+        } else {
+          setMyUsername('');
         }
       } catch {
         setMyUsername('');
@@ -94,13 +102,59 @@ export const UsernameRegistry = () => {
     return () => clearTimeout(timer);
   }, [lookup]);
 
-  const handleRegister = async () => {
-    if (!address || !username.trim()) return;
+  /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
+  const handleCheckAvailability = async () => {
+    if (!username.trim()) return;
 
     try {
       const result = await callReadOnly('get-address', [
         stringAsciiCV(username.trim()),
       ]);
+
+      // Strict parsing to avoid false positives
+      // We expect (response (optional principal)) or just (optional principal)
+
+      let data = result;
+
+      // 1. Unwrap 'response' or 'success' wrapper if present
+      if (data && (data.type === 'success' || data.type === 'response') && data.value) {
+        data = data.value;
+      }
+
+      // 2. Check if it's an 'optional' type
+      if (data && data.type === 'optional') {
+        // (ok none) or (none) -> value is null -> Available
+        if (data.value === null) {
+          setAvailability('available');
+        } else {
+          // (ok (some ...)) -> value is not null -> Taken
+          setAvailability('taken');
+        }
+      } else {
+        // Fallback: If structure is unexpected, check if we found a principal string
+        // This is a safety net. If we can't confirm it's occupied, we let them try.
+        if (JSON.stringify(data).includes('"type":"principal"')) {
+          setAvailability('taken');
+        } else {
+          setAvailability('available');
+        }
+      }
+    } catch {
+      // If check fails, default to available to allow attempt
+      setAvailability('available');
+    }
+  };
+
+  const handleRegister = async () => {
+    if (!address || !username.trim()) return;
+
+    // Double-check availability directly from the identity contract
+    try {
+      const result = await callReadOnly('get-address', [
+        stringAsciiCV(username.trim()),
+      ]);
+
+      // If result has a value, the username is already registered (taken)
       if (result.value) {
         setAvailability('taken');
         alert('Username already taken.');
@@ -108,6 +162,7 @@ export const UsernameRegistry = () => {
       }
       setAvailability('available');
     } catch {
+      // If check fails, assume available or let contract fail
       setAvailability('available');
     }
 
@@ -121,6 +176,10 @@ export const UsernameRegistry = () => {
         network: STACKS_TESTNET,
         onFinish: async () => {
           setMyUsername(username.trim());
+          // Set pending state to allow navigation to dashboard immediately
+          if (address) {
+            localStorage.setItem(`pending_username_${address}`, username.trim());
+          }
           if (db && isFirebaseConfigured) {
             await setDoc(doc(db, 'usernames', username.trim()), {
               username: username.trim(),
@@ -128,6 +187,10 @@ export const UsernameRegistry = () => {
               registeredAt: serverTimestamp(),
             });
           }
+          // Redirect to dashboard
+          setTimeout(() => {
+            navigate('/');
+          }, 1000);
         },
       });
     } catch (error) {
@@ -161,18 +224,7 @@ export const UsernameRegistry = () => {
     }
   };
 
-  const handleCheckAvailability = async () => {
-    if (!username.trim()) return;
 
-    try {
-      const result = await callReadOnly('get-address', [
-        stringAsciiCV(username.trim()),
-      ]);
-      setAvailability(result.value ? 'taken' : 'available');
-    } catch {
-      setAvailability('available');
-    }
-  };
 
   if (!isConnected) {
     return (
@@ -243,7 +295,7 @@ export const UsernameRegistry = () => {
                     }}
                     placeholder="yourname"
                     maxLength={20}
-                    className="input-premium pl-12 text-2xl font-serif h-16"
+                    className="input-premium !pl-20 text-2xl font-serif h-16"
                   />
                   <div className="absolute right-4 top-1/2 -translate-y-1/2">
                     {availability === 'available' && <span className="text-emerald-500 text-xl font-bold">✓</span>}
@@ -275,7 +327,7 @@ export const UsernameRegistry = () => {
               )}
             </AnimatePresence>
 
-            {/* Register Button */}
+            {/* Register/Claim Button */}
             {!myUsername && (
               <button
                 onClick={handleRegister}
@@ -286,7 +338,7 @@ export const UsernameRegistry = () => {
                   <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <>
-                    <span>Register Identity</span>
+                    <span>Claim Username</span>
                     <span>→</span>
                   </>
                 )}
@@ -337,7 +389,7 @@ export const UsernameRegistry = () => {
                   value={lookup}
                   onChange={(event) => setLookup(event.target.value)}
                   placeholder="alice"
-                  className="input-premium pl-12 text-2xl font-serif h-16"
+                  className="input-premium !pl-20 text-2xl font-serif h-16"
                 />
                 {lookingUp && (
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 border-2 border-accent-indigo border-t-transparent rounded-full animate-spin" />

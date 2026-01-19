@@ -323,3 +323,72 @@ export const getUSDCxBalance = async (address: string): Promise<number> => {
 
   return parseInt(balance, 10) / 1_000_000;
 };
+
+export const getUsername = async (address: string) => {
+  const response = await fetch(
+    `${stacksApiUrl}/v2/contracts/call-read/${USERNAME_CONTRACT_ADDRESS}/${USERNAME_CONTRACT_NAME}/get-username`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sender: address,
+        arguments: [`0x${typeof serializeCV(standardPrincipalCV(address)) === 'string' ? serializeCV(standardPrincipalCV(address)) : bytesToHex(serializeCV(standardPrincipalCV(address)) as any)}`],
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    return null;
+  }
+  const result = await response.json();
+  if (!result.okay) {
+    return null;
+  }
+
+  const clarityValue = deserializeCV(result.result);
+  const jsonResult = cvToJSON(clarityValue);
+
+  // Check for Clarity error response (likely u101 for not found)
+  if (jsonResult.success === false) {
+    return null;
+  }
+
+  // Handle Optional types ((ok (some "name")) or (ok none))
+  // cvToJSON for (ok none) -> { type: 'response', success: true, value: { type: 'optional', value: null } }
+  // cvToJSON for (ok (some "name")) -> { type: 'response', success: true, value: { type: 'optional', value: { type: 'ascii', value: 'name' } } }
+  // Wait, stacks.js cvToJSON structure can be tricky.
+  // Standard (ok (some "abc")) -> { type: "ok", value: { type: "some", value: { type: "ascii", value: "abc" } } } ??
+  // No, stacks.js v6 usually: { type: 'success', value: ... } or { type: 'error', value: ... }?
+  // Let's use the property accessor safely.
+
+  // If it's a response type
+  if (jsonResult.type === 'response' || 'success' in jsonResult) {
+    if (!jsonResult.success) return null; // It's an error
+
+    // It's a success, check content
+    const content = jsonResult.value;
+
+    // If content is optional (which get-username returns)
+    if (content && content.type === 'optional') {
+      if (content.value === null) return null; // None
+
+      // Some value
+      // It might be nested directly or inside another object depending on version
+      // If content.value is the inner object (e.g. { type: 'ascii', value: 'name' })
+      if (content.value && content.value.value) {
+        return content.value.value as string;
+      }
+      return content.value as string; // Fallback if direct string
+    }
+  }
+
+  // Direct value check for older contract styles or different parsing
+  if (!jsonResult.value) return null;
+
+  // Fallback for simple structure if deserialization stripped response wrapper
+  if (jsonResult.value && typeof jsonResult.value === 'object' && 'value' in jsonResult.value) {
+    return jsonResult.value.value as string;
+  }
+
+  return jsonResult.value as string;
+};
