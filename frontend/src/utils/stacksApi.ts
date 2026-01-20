@@ -169,3 +169,137 @@ export const getSmartContractMetadata = async (contractAddress: string, contract
         return null;
     }
 };
+
+// --- Transaction History ---
+
+export interface Transaction {
+    tx_id: string;
+    tx_status: string;
+    tx_type: string;
+    fee_rate: string;
+    sender_address: string;
+    sponsored: boolean;
+    block_height: number;
+    burn_block_time: number;
+    block_time?: number; // Added for convenience (mapped from burn_block_time or receipt_time)
+    receipt_time?: number; // For mempool transactions
+    parent_tx_id: string;
+    tx_index: number;
+    token_transfer?: {
+        recipient_address: string;
+        amount: string;
+        memo: string;
+    };
+    contract_call?: {
+        contract_id: string;
+        function_name: string;
+        function_args: {
+            hex: string;
+            repr: string;
+            name: string;
+            type: string;
+        }[];
+    };
+    smart_contract?: {
+        contract_id: string;
+        source_code: string;
+    };
+    ft_transfers?: {
+        asset_identifier: string;
+        amount: string;
+        sender?: string;
+        recipient?: string;
+    }[];
+    [key: string]: any;
+}
+
+export interface TransactionListResponse {
+    limit: number;
+    offset: number;
+    total: number;
+    results: Transaction[];
+}
+
+export interface MempoolTransactionListResponse {
+    limit: number;
+    offset: number;
+    total: number;
+    results: Transaction[];
+}
+
+/**
+ * Get account transactions
+ * GET /extended/v1/address/{address}/transactions
+ */
+export const getAccountTransactions = async (address: string, limit: number = 50, offset: number = 0) => {
+    const url = `${STACKS_API_BASE_URL}/extended/v1/address/${address}/transactions?limit=${limit}&offset=${offset}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Error fetching account transactions: ${response.statusText}`);
+    return response.json() as Promise<TransactionListResponse>;
+};
+
+/**
+ * Get account mempool transactions
+ * GET /extended/v1/address/{address}/mempool
+ */
+export const getAccountMempoolTransactions = async (address: string, limit: number = 50, offset: number = 0) => {
+    const url = `${STACKS_API_BASE_URL}/extended/v1/address/${address}/mempool?limit=${limit}&offset=${offset}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Error fetching account mempool transactions: ${response.statusText}`);
+    return response.json() as Promise<MempoolTransactionListResponse>;
+};
+
+/**
+ * Broadcast raw transaction
+ * POST /v2/transactions
+ */
+export const broadcastTransaction = async (txHex: string | Uint8Array) => {
+    const url = `${STACKS_API_BASE_URL}/v2/transactions`;
+    const body = typeof txHex === 'string' ? txHex : Array.from(txHex).map(b => b.toString(16).padStart(2, '0')).join('');
+
+    // content: application/json -> schema: { tx: string (hex) }
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tx: body })
+    });
+
+    if (!response.ok) {
+        try {
+            const err = await response.json();
+            throw new Error(`Broadcast failed: ${err.error} - ${err.reason}`);
+        } catch (e: any) {
+            throw new Error(`Error broadcasting transaction: ${response.statusText}`);
+        }
+    }
+    return response.json() as Promise<string>; // Returns txid
+};
+
+/**
+ * Retrieve transaction details by TXID
+ * GET /v3/transaction/{txid}
+ */
+export const getTransactionById = async (txid: string) => {
+    const url = `${STACKS_API_BASE_URL}/v3/transaction/${txid}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Error fetching transaction: ${response.statusText}`);
+    return response.json() as Promise<{
+        index_block_hash: string;
+        tx: string; // Hex
+        result: string; // Hex Clarity result
+    }>;
+};
+
+/**
+ * Get unconfirmed transaction
+ * GET /v2/transactions/unconfirmed/{txid}
+ */
+export const getUnconfirmedTransactionById = async (txid: string) => {
+    const url = `${STACKS_API_BASE_URL}/v2/transactions/unconfirmed/${txid}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Error fetching unconfirmed transaction: ${response.statusText}`);
+    return response.json() as Promise<{
+        tx: string;
+        status: "Mempool" | { Microblock: { block_hash: string; seq: number } };
+    }>;
+};
