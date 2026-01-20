@@ -19,6 +19,8 @@
 
 [Live Demo](https://stackspay-pro.vercel.app/) | [Video Link](https://youtu.be/M06o_ZFQtzE) | [GitHub](https://github.com/NikhilRaikwar/StackPay)
 
+<video src="frontend/public/stackspay.mp4" controls="controls" style="max-width: 100%; width: 100%;"></video>
+
 ---
 
 **StackPay** is a comprehensive peer-to-peer payment solution built on the Stacks blockchain, leveraging **USDCx** (bridged USDC via Circle's xReserve protocol) to enable secure, trustless transactions with escrow protection, QR code payments, and seamless Ethereum-to-Stacks bridging.

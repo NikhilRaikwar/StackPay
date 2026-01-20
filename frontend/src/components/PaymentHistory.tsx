@@ -5,40 +5,25 @@ import { usePayment } from '../hooks/usePayment';
 import { useWallet } from '../hooks/useWallet';
 import {
   cancelPaymentRequest,
+  getPaymentRequest,
   PAYMENT_CONTRACT_ADDRESS,
   PAYMENT_CONTRACT_NAME,
   USDCX_CONTRACT_ADDRESS,
   USERNAME_CONTRACT_ADDRESS,
   USERNAME_CONTRACT_NAME
 } from '../utils/stacksUtils';
+import {
+  getAccountTransactions,
+  getAccountMempoolTransactions,
+  type Transaction
+} from '../utils/stacksApi';
 
 import { standardPrincipalCV, cvToJSON, deserializeCV, serializeCV } from '@stacks/transactions';
 import { STACKS_TESTNET } from '@stacks/network';
 import { db, isFirebaseConfigured } from '../utils/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 
-interface Transaction {
-  tx_id: string;
-  tx_type: string;
-  tx_status: string;
-  block_time: number;
-  sender_address: string;
-  contract_call?: {
-    function_name: string;
-    function_args: any[];
-    contract_id: string;
-  };
-  token_transfer?: {
-    recipient_address: string;
-    amount: string;
-  };
-  ft_transfers?: {
-    recipient: string;
-    sender: string;
-    amount: string;
-    asset_identifier: string;
-  }[];
-}
+// Local Transaction interface removed in favor of stacksApi type
 
 interface PaymentItem {
   id: string;
@@ -134,9 +119,29 @@ export const PaymentHistory = () => {
             requestType: data.type || 'escrow'
           });
         });
-        setPendingClaims(claims);
+        const validatedClaims: (PendingClaim | null)[] = await Promise.all(claims.map(async (claim) => {
+          try {
+            // Verify on-chain status to ensure we don't show paid requests
+            const onChainData = await getPaymentRequest(claim.requestId);
 
-        const creators = claims.map(c => c.creator).filter(Boolean);
+            // If the contract says it's claimed, we should hide it and update our DB
+            if (onChainData && onChainData.claimed) {
+              console.log(`[Validation] Claim ${claim.requestId} is already claimed on-chain. Updating DB...`);
+              const docRef = doc(db as any, 'payments', claim.requestId);
+              // Fire and forget update
+              updateDoc(docRef, { status: 'completed' }).catch(err => console.warn("Failed to auto-update firebase", err));
+              return null;
+            }
+          } catch (e) {
+            console.warn(`Failed to verify claim ${claim.requestId} on-chain`, e);
+          }
+          return claim;
+        }));
+
+        const finalClaims = validatedClaims.filter((c): c is PendingClaim => c !== null);
+        setPendingClaims(finalClaims);
+
+        const creators = finalClaims.map(c => c.creator).filter(Boolean);
         void resolveAddresses(creators);
 
       } catch (error: any) {
@@ -156,18 +161,23 @@ export const PaymentHistory = () => {
       void fetchPendingClaims();
 
       try {
-        const [confirmedRes, mempoolRes] = await Promise.all([
-          fetch(`https://api.testnet.hiro.so/extended/v1/address/${address}/transactions?limit=50`),
-          fetch(`https://api.testnet.hiro.so/extended/v1/address/${address}/mempool?limit=50`)
+        const [confirmedData, mempoolData] = await Promise.all([
+          getAccountTransactions(address),
+          getAccountMempoolTransactions(address)
         ]);
 
-        const confirmedData = await confirmedRes.json();
-        const mempoolData = await mempoolRes.json();
-
         // Combine confirmed and mempool transactions
-        const allTxs = [
-          ...(mempoolData.results || []).map((tx: any) => ({ ...tx, block_time: tx.receipt_time || Date.now() / 1000, tx_status: 'pending' })),
-          ...(confirmedData.results || [])
+        const allTxs: Transaction[] = [
+          ...(mempoolData.results || []).map((tx) => ({
+            ...tx,
+            block_time: tx.receipt_time || Date.now() / 1000,
+            tx_status: 'pending'
+          })),
+          ...(confirmedData.results || []).map((tx) => ({
+            ...tx,
+            // Ensure block_time exists for confirmed txs (API usually provides burn_block_time)
+            block_time: tx.block_time || tx.burn_block_time
+          }))
         ];
 
         const items: PaymentItem[] = [];
@@ -218,7 +228,7 @@ export const PaymentHistory = () => {
                 sender: tx.sender_address,
                 memo,
                 status: currentStatus as any,
-                timestamp: tx.block_time * 1000,
+                timestamp: (tx.block_time || Date.now() / 1000) * 1000,
                 type: tx.sender_address === address ? 'sent' : 'request',
               });
             } else if (functionName === 'claim-payment') {
@@ -243,7 +253,7 @@ export const PaymentHistory = () => {
                 sender: sender, // This might be elusive in mempool without events, but we try
                 memo: 'Payment Claimed',
                 status: tx.tx_status === 'success' ? 'completed' : tx.tx_status === 'pending' ? 'pending' : 'failed',
-                timestamp: tx.block_time * 1000,
+                timestamp: (tx.block_time || Date.now() / 1000) * 1000,
                 type: 'received',
               });
             } else if (functionName === 'pay-invoice') {
@@ -261,7 +271,7 @@ export const PaymentHistory = () => {
                 sender: tx.sender_address,
                 memo: 'Invoice Paid',
                 status: tx.tx_status === 'success' ? 'completed' : tx.tx_status === 'pending' ? 'pending' : 'failed',
-                timestamp: tx.block_time * 1000,
+                timestamp: (tx.block_time || Date.now() / 1000) * 1000,
                 type: tx.sender_address === address ? 'sent' : 'received',
               });
             }
@@ -280,7 +290,7 @@ export const PaymentHistory = () => {
                 sender: tx.sender_address,
                 memo: `Identity Claim: @${name}`,
                 status: tx.tx_status === 'success' ? 'completed' : tx.tx_status === 'pending' ? 'pending' : 'failed',
-                timestamp: tx.block_time * 1000,
+                timestamp: (tx.block_time || Date.now() / 1000) * 1000,
                 type: 'sent',
               });
             }
@@ -295,11 +305,11 @@ export const PaymentHistory = () => {
                     id: tx.tx_id,
                     txId: tx.tx_id,
                     amount: parseInt(ft.amount) / 1_000_000,
-                    recipient: ft.recipient,
-                    sender: ft.sender,
+                    recipient: ft.recipient || 'Unknown',
+                    sender: ft.sender || 'Unknown',
                     memo: 'USDCx Transfer',
                     status: tx.tx_status === 'success' ? 'completed' : tx.tx_status === 'pending' ? 'pending' : 'failed',
-                    timestamp: tx.block_time * 1000,
+                    timestamp: (tx.block_time || Date.now() / 1000) * 1000,
                     type: ft.sender === address ? 'sent' : 'received',
                   });
                 }
